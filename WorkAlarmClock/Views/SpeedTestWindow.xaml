@@ -1,0 +1,113 @@
+﻿<Window x:Class="WorkAlarmClock.Views.SpeedTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="网络测速"
+        Width="470" Height="560"
+        MinWidth="430" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BrushPanelGradient}"
+        FontFamily="Microsoft YaHei UI">
+    <Grid Margin="16,14,16,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="网络测速" FontSize="18" FontWeight="Bold"
+                   Foreground="{StaticResource BrushTextPrimary}" />
+        <TextBlock Grid.Row="1" Text="国内镜像测下载 · Cloudflare 测上传，指针实时跟随"
+                   Style="{StaticResource HintTextStyle}" Margin="0,4,0,0" />
+
+        <!-- ========== 仪表盘 ========== -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="8,10,8,8" Margin="0,12,0,0">
+            <StackPanel HorizontalAlignment="Center">
+                <!-- 当前指标（随阶段切换：下载 / 上传） -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,2">
+                    <Ellipse Width="9" Height="9" Fill="{Binding GaugeBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding GaugeLabel}" FontSize="12.5" FontWeight="SemiBold" Margin="6,0,0,0"
+                               VerticalAlignment="Center" Foreground="{StaticResource BrushTextPrimary}" />
+                    <TextBlock Text="速率" FontSize="12.5" Margin="3,0,0,0" VerticalAlignment="Center"
+                               Foreground="{StaticResource BrushTextSecondary}" />
+                </StackPanel>
+
+                <Canvas x:Name="GaugeCanvas" Width="320" Height="182" HorizontalAlignment="Center">
+                    <Canvas x:Name="GaugeTicks" Width="320" Height="182" />
+
+                    <!-- 单指针：下载阶段蓝色，上传阶段绿色 -->
+                    <Path x:Name="Needle" Data="M160,44 L167,160 L153,160 Z" Fill="{Binding GaugeBrush}">
+                        <Path.RenderTransform>
+                            <RotateTransform x:Name="NeedleRotate" CenterX="160" CenterY="160" Angle="-90" />
+                        </Path.RenderTransform>
+                    </Path>
+
+                    <Ellipse Canvas.Left="148" Canvas.Top="148" Width="24" Height="24" Fill="#FF27313D" />
+                    <Ellipse Canvas.Left="155" Canvas.Top="155" Width="10" Height="10" Fill="#FFFFFFFF" />
+                </Canvas>
+
+                <TextBlock Text="{Binding StageText}" Style="{StaticResource CaptionStyle}"
+                           HorizontalAlignment="Center" Margin="0,4,0,0" TextWrapping="Wrap"
+                           MaxWidth="320" TextAlignment="Center" />
+                <TextBlock Text="{Binding NodeText}" Style="{StaticResource HintTextStyle}"
+                           HorizontalAlignment="Center" Margin="0,2,0,0" />
+            </StackPanel>
+        </Border>
+
+        <!-- ========== 下载 / 上传 / 延迟 ========== -->
+        <UniformGrid Grid.Row="3" Columns="3" Margin="0,10,0,0">
+            <Border Style="{StaticResource CardStyle}" Padding="12,10" Margin="0,0,6,0">
+                <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7" Height="7" Fill="#FF3B7DF6" VerticalAlignment="Center" />
+                        <TextBlock Text="下载" Style="{StaticResource CaptionStyle}" Margin="5,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding DownloadText}" FontSize="17" FontWeight="Bold"
+                               FontFamily="Consolas" Foreground="{StaticResource BrushAccentDeep}"
+                               Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}" Padding="12,10" Margin="0,0,6,0">
+                <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7" Height="7" Fill="#FF32C48D" VerticalAlignment="Center" />
+                        <TextBlock Text="上传" Style="{StaticResource CaptionStyle}" Margin="5,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding UploadText}" FontSize="17" FontWeight="Bold"
+                               FontFamily="Consolas" Foreground="#FF2A9E71"
+                               Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}" Padding="12,10">
+                <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7" Height="7" Fill="#FFB07B2E" VerticalAlignment="Center" />
+                        <TextBlock Text="延迟" Style="{StaticResource CaptionStyle}" Margin="5,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding LatencyText}" FontSize="17" FontWeight="Bold"
+                               FontFamily="Consolas" Foreground="#FF8A5A00"
+                               Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- ========== 底部按钮 ========== -->
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="开始测速" Command="{Binding RunCommand}" MinWidth="104" Height="34">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsTesting}" Value="True">
+                                <Setter Property="IsEnabled" Value="False" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="关闭" Command="{Binding CloseCommand}" Style="{StaticResource PrimaryButtonStyle}"
+                    MinWidth="66" Height="34" Margin="0" />
+        </StackPanel>
+    </Grid>
+</Window>

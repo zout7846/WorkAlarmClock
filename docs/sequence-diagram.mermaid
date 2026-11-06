@@ -1,0 +1,119 @@
+%% WorkAlarmClock — 关键流程时序图（sequenceDiagram）
+%% 三张图：① 启动初始化与状态落位 ② 空闲/锁屏触发休息与恢复 ③ 下班前提醒与日报生成
+
+%% ============ ① 启动初始化与状态落位 ============
+sequenceDiagram
+    participant App as App.OnStartup
+    participant Env as AppEnvironment
+    participant SV as AppServices
+    participant Set as SettingsService
+    participant Stg as StorageService
+    participant Sch as ScheduleService
+    participant TT as TimeTrackingService
+    participant IM as IdleMonitorService
+    participant RM as ReminderService
+    participant NT as NotificationService
+    participant PW as PetWindow
+
+    App->>Env: EnsureSingleInstance(Mutex)
+    alt 已有实例
+        App-->>App: System.Windows.MessageBox 提示后 Shutdown()
+    end
+    App->>SV: Initialize()
+    SV->>Set: LoadSettings()
+    Set->>Stg: LoadSettings()
+    Stg-->>Set: AppSettings(文件缺失则 CreateDefault)
+    SV->>Stg: EnsureArchive(today)
+    SV->>TT: LoadOrCreateToday()
+    TT->>Stg: LoadDay(today)
+    alt 当日无流水
+        TT->>Sch: GetExpectedState(now)
+        Sch-->>TT: 期望状态(工作日+时段判定)
+        TT->>TT: Transitions.Add(初始落位, Source=Schedule)
+        TT->>Stg: SaveDay(原子写 .tmp 再 Move)
+    else 已有流水
+        TT->>TT: Replay(transitions) 幂等重算当前状态与时长
+    end
+    SV->>IM: Start() 订阅 SessionSwitch + 空闲轮询
+    SV->>RM: Start()
+    SV->>NT: InitializeTray(TrayMenuCallbacks)
+    SV-->>SV: 全部事件接线(Ticker/状态/提醒)
+    SV->>SV: Ticker.Start()
+    App->>PW: new PetWindow() + Show()
+    Note over PW: 恢复记忆位置/透明度，置顶悬浮
+    App-->>App: base.OnStartup 完成
+
+%% ============ ② 空闲/锁屏触发休息与恢复 ============
+sequenceDiagram
+    participant IM as IdleMonitorService
+    participant TT as TimeTrackingService
+    participant Stg as StorageService
+    participant NT as NotificationService
+    participant PW as PetWindow
+
+    Note over IM: Ticker 每 5 秒抽样 GetLastInputInfo
+    IM->>IM: idleSpan ≥ 阈值 且 当前非锁屏 且 边沿触发
+    IM-->>TT: IdleDetected
+    TT->>TT: 当前=Working 且 未 ManualEnded?
+    TT->>TT: Transitions.Add(Working→Resting, Source=Idle)
+    TT->>Stg: SaveDay(原子写)
+    TT-->>NT: StateChanged(Resting)
+    NT->>PW: 更新表情(休息/zZ)+托盘图标变黄
+    Note over IM: 用户键鼠操作恢复(边沿)
+    IM-->>TT: ActivityResumed
+    TT->>TT: Resting 且 来源=Idle 且 在工作时段 且 未 ManualEnded?
+    TT->>TT: Transitions.Add(Resting→Working, Source=Idle)
+    TT->>Stg: SaveDay
+    TT-->>NT: StateChanged(Working)
+    NT->>PW: 气泡 已恢复工作 点此纠正(点击→切回 Resting)
+    Note over IM: SessionSwitch(SessionLock/Logoff/RemoteDisconnect)
+    IM-->>TT: Locked
+    TT->>TT: 若 Working → Resting(Source=Lock)，锁屏期间抑制空闲检测
+    Note over IM: SessionSwitch(SessionUnlock)
+    IM-->>TT: Unlocked
+    TT->>TT: 若 Lock 来源休息且应工作 → Resting→Working(Source=Lock) + 气泡纠正
+
+%% ============ ③ 下班前提醒与日报生成 ============
+sequenceDiagram
+    participant RM as ReminderService
+    participant TT as TimeTrackingService
+    participant RS as ReportService
+    participant NT as NotificationService
+    participant U as 用户
+    participant RPW as ReportPreviewWindow
+    participant SRW as StrongReminderWindow
+
+    Note over RM: 每 Tick 检查 now ≥ WorkEnd − 30min
+    RM->>RM: 工作日+开关开+未忽略+未在等待期?
+    RM-->>NT: ReminderDue(Weak)
+    NT->>NT: PlaySound(Weak) + 托盘 BalloonTip
+    alt 当天已生成过日报
+        NT->>U: 仅气泡文字通知，无按钮
+    else 未生成
+        NT->>U: 桌宠气泡[立即生成/稍后提醒/忽略]
+        alt 立即生成
+            U->>RPW: 打开日报预览面板
+            U->>RPW: 填明日计划/风险后点[重新生成]
+            RPW->>RS: RenderMarkdown(plan, risks)
+            RS-->>RPW: 预览文本实时刷新
+            RPW->>RS: Generate(plan, risks)
+            RS->>RS: 旧文件→复制 .bak→覆盖写 .md(目录自动创建)
+            RS->>TT: Reports.Add(生成记录)
+            RS-->>NT: 气泡 已生成+已复制 + [打开目录]
+            RM->>RM: OnReportGenerated() 当日不再弹
+        else 稍后提醒
+            U->>RM: DeferWeak(10min) → WeakDeferredUntil
+        else 忽略
+            U->>RM: IgnoreWeak() 当日静默
+        end
+    end
+    Note over RM: now ≥ WorkEnd − 5min
+    RM-->>NT: ReminderDue(Strong)
+    NT->>SRW: 显示全屏遮罩模态窗(置顶/禁Alt+F4)+PlaySound(Strong)
+    alt 点击[已打卡]
+        SRW->>RM: AcknowledgeStrong() → 关闭
+    else 未确认
+        loop 每 StrongRepeatInterval 最多 StrongRepeatMax 次
+            SRW->>SRW: 窗口闪烁 + PlaySound(Strong)
+        end
+    end

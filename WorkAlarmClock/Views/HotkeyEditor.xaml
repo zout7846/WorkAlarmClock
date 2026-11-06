@@ -1,0 +1,16 @@
+<UserControl x:Class="WorkAlarmClock.Views.HotkeyEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <StackPanel Orientation="Horizontal">
+        <Button x:Name="CaptureButton"
+                MinWidth="120" Padding="8,2" Margin="0,0,6,0"
+                Click="OnCaptureClick" Cursor="Hand" />
+        <CheckBox x:Name="CtrlBox" Content="Ctrl" VerticalAlignment="Center" Margin="0,0,4,0"
+                  Checked="OnModifierChanged" Unchecked="OnModifierChanged" />
+        <CheckBox x:Name="AltBox" Content="Alt" VerticalAlignment="Center" Margin="0,0,4,0"
+                  Checked="OnModifierChanged" Unchecked="OnModifierChanged" />
+        <CheckBox x:Name="ShiftBox" Content="Shift" VerticalAlignment="Center"
+                  Checked="OnModifierChanged" Unchecked="OnModifierChanged" />
+    </StackPanel>
+</UserControl>

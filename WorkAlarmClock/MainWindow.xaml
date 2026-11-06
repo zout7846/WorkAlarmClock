@@ -1,0 +1,422 @@
+﻿<Window x:Class="WorkAlarmClock.MainWindow"
+        x:Name="MainRoot"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="WorkAlarmClock 工作日记"
+        Width="440" Height="790"
+        MinWidth="400" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BrushPanelGradient}"
+        FontFamily="Microsoft YaHei UI"
+        Closing="OnWindowClosing">
+    <Grid Margin="14,14,14,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ 顶部渐变头卡：状态 + 时钟 + 快捷图标 ============ -->
+        <Border Grid.Row="0" CornerRadius="16" Background="{StaticResource BrushHeaderGradient}" Padding="16,14">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="22" ShadowDepth="4" Direction="270" Opacity="0.26" Color="#FF2158D6" />
+            </Border.Effect>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Vertical">
+                    <!-- 状态胶囊 -->
+                    <Border Background="#33FFFFFF" CornerRadius="10" Padding="8,3" HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="#FFD6E2F2" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CurrentState}" Value="Working">
+                                                <Setter Property="Fill" Value="#FF7BF1A8" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CurrentState}" Value="Resting">
+                                                <Setter Property="Fill" Value="#FFFFD873" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CurrentState}" Value="OffWork">
+                                                <Setter Property="Fill" Value="#FFCBD6E4" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="{Binding StateText}" Foreground="#FFFFFFFF" FontSize="12"
+                                       FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="已结束当天" Foreground="#CCFFFFFF" FontSize="10.5" Margin="6,0,0,0"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ManualEnded}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding NowText}" Foreground="#FFFFFFFF" FontSize="34" FontWeight="Bold"
+                               Margin="0,8,0,0" FontFamily="Segoe UI Semibold" />
+                    <TextBlock Text="今日累计工作 / 休息见下方卡片" Foreground="#B3FFFFFF" FontSize="11" Margin="0,2,0,0" />
+                </StackPanel>
+
+                <!-- 快捷图标 -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Style="{StaticResource IconButtonStyle}" Content="&#xE81C;"
+                            Foreground="#FFFFFFFF" ToolTip="历史日报"
+                            Command="{Binding OpenHistoryCommand}" />
+                    <Button Style="{StaticResource IconButtonStyle}" Content="&#xE722;"
+                            Foreground="#FFFFFFFF" ToolTip="区域截图（Ctrl+Alt+A）"
+                            Command="{Binding ScreenshotCommand}" />
+                    <Button Style="{StaticResource IconButtonStyle}" Content="&#xE9D9;"
+                            Foreground="#FFFFFFFF" ToolTip="工作统计"
+                            Command="{Binding OpenStatisticsCommand}" />
+                    <Button Style="{StaticResource IconButtonStyle}" Content="&#xE713;"
+                            Foreground="#FFFFFFFF" ToolTip="设置"
+                            Command="{Binding OpenSettingsCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 统计卡片 ============ -->
+        <UniformGrid Grid.Row="1" Columns="4" Margin="0,10,0,0">
+            <Border Style="{StaticResource CardStyle}" Padding="10,9" Margin="0,0,6,0">
+                <StackPanel>
+                    <TextBlock Text="工作" Style="{StaticResource CaptionStyle}" />
+                    <TextBlock Text="{Binding WorkDurationText}" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushStateWorking}" Margin="0,3,0,0" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}" Padding="10,9" Margin="0,0,6,0">
+                <StackPanel>
+                    <TextBlock Text="休息" Style="{StaticResource CaptionStyle}" />
+                    <TextBlock Text="{Binding RestDurationText}" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushStateResting}" Margin="0,3,0,0" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}" Padding="10,9" Margin="0,0,6,0">
+                <StackPanel>
+                    <TextBlock Text="午休" Style="{StaticResource CaptionStyle}" />
+                    <TextBlock Text="{Binding LunchDurationText}" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushStateLunch}" Margin="0,3,0,0" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}" Padding="10,9">
+                <StackPanel>
+                    <TextBlock Text="本周" Style="{StaticResource CaptionStyle}" />
+                    <TextBlock Text="{Binding WeekWorkText}" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushAccent}" Margin="0,3,0,0" />
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- ============ 操作行 ============ -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="开始工作" Command="{Binding StartWorkCommand}"
+                    Style="{StaticResource AccentButtonStyle}" Height="38" MinWidth="104" />
+            <Button Content="开始休息" Command="{Binding StartRestCommand}"
+                    Style="{StaticResource PrimaryButtonStyle}" Height="38" MinWidth="96" />
+            <Button Content="结束当天" Command="{Binding EndDayCommand}"
+                    Style="{StaticResource PrimaryButtonStyle}" Height="38" MinWidth="96" Margin="0" />
+        </StackPanel>
+
+        <!-- ============ 番茄钟 ============ -->
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Margin="0,12,0,0" Padding="14,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="34" Height="34" CornerRadius="11" VerticalAlignment="Center">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#FFFF8A80" Offset="0" />
+                                <GradientStop Color="#FFF0564D" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="15"
+                                   Foreground="#FFFFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Orientation="Vertical" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding FocusTimeText}" FontSize="21" FontWeight="Bold"
+                                   FontFamily="Segoe UI Semibold" Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock FontSize="10.5" Foreground="{StaticResource BrushTextSecondary}">
+                            <Run Text="{Binding FocusPhaseText, Mode=OneWay}" />
+                            <Run Text=" · " />
+                            <Run Text="{Binding FocusRoundsText, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="跳过" Command="{Binding FocusSkipCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}" MinWidth="60" Height="30" Margin="0,0,6,0" />
+                    <Button Content="{Binding FocusButtonText}" Command="{Binding FocusToggleCommand}"
+                            MinWidth="88" Height="30" Margin="0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+                                <Setter Property="Background" Value="{StaticResource BrushAccentGradient}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFocusRunning}" Value="True">
+                                        <Setter Property="Background" Value="#FFEF5A5A" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 工具磁贴行 ============ -->
+        <UniformGrid Grid.Row="4" Columns="4" Margin="0,12,0,0">
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenWeatherCommand}" Margin="0,0,6,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding WeatherTileGlyph}" FontFamily="Segoe MDL2 Assets" FontSize="20"
+                               Foreground="{StaticResource BrushAccent}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding WeatherTileText}" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="{Binding WeatherTileSub}" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenCountdownCommand}" Margin="0,0,6,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                               Foreground="{StaticResource BrushStateLunch}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CountdownTileText}" FontSize="14" FontWeight="SemiBold"
+                                   FontFamily="Consolas" Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="倒计时" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenClipboardCommand}" Margin="0,0,6,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                               Foreground="#FF6C5CE0" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ClipboardTileText}" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="剪贴板" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenSpeedTestCommand}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="10" Height="10" Fill="{Binding NetworkTileColor}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding NetworkTileText}" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="{Binding NetworkTileSub}" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </UniformGrid>
+
+        <!-- ============ 本周统计（可折叠） ============ -->
+        <Border Grid.Row="5" Margin="0,12,0,0" VerticalAlignment="Top">
+            <Border.Style>
+                <Style TargetType="Border" BasedOn="{StaticResource CardStyle}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StatsVisible}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <TextBlock Text="本周统计（按工作日累计）" Style="{StaticResource SectionTitleStyle}" />
+                <UniformGrid Columns="2">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="工作" Style="{StaticResource HintTextStyle}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding WeekWorkText}" Style="{StaticResource PillValueStyle}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="休息" Style="{StaticResource HintTextStyle}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding WeekRestText}" Style="{StaticResource PillValueStyle}" />
+                    </StackPanel>
+                </UniformGrid>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ 今日事项 ============ -->
+        <Grid Grid.Row="6" Margin="0,14,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="2,0,0,8">
+                <TextBlock Text="今日事项" Style="{StaticResource SectionTitleStyle}" Margin="0" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <ComboBox ItemsSource="{Binding TagFilters}" SelectedItem="{Binding SelectedTagFilter}"
+                              Width="96" Height="26" FontSize="11.5" Margin="0,0,8,0" />
+                    <TextBlock Style="{StaticResource CaptionStyle}" VerticalAlignment="Center">
+                        <Run Text="{Binding Tasks.Count, Mode=OneWay}" />
+                        <Run Text=" 条" />
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <!-- 空列表占位 -->
+                <Border VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Background="#FFF7FAFF" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1"
+                        CornerRadius="14" Padding="18,14" Margin="12,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Tasks.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Text="&#xE7C3;" FontFamily="Segoe MDL2 Assets" FontSize="20"
+                                   Foreground="{StaticResource BrushAccent}" HorizontalAlignment="Center" />
+                        <TextBlock Text="今天还没有记录" FontSize="12.5" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}" HorizontalAlignment="Center" Margin="0,6,0,2" />
+                        <TextBlock Text="在下方输入「我在做什么」，回车即可记一条"
+                                   Style="{StaticResource HintTextStyle}" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <ListBox ItemsSource="{Binding TasksView}" Style="{StaticResource TaskListStyle}"
+                         ItemContainerStyle="{StaticResource TaskItemStyle}"
+                         HorizontalContentAlignment="Stretch" MinHeight="80">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{StaticResource BrushAccentLight}" CornerRadius="7" Padding="7,2"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Timestamp, StringFormat=HH:mm}"
+                                               FontSize="11" Foreground="{StaticResource BrushAccentDeep}" />
+                                </Border>
+                                <Border Grid.Column="1" CornerRadius="7" Padding="7,2" Margin="6,0,0,0"
+                                        VerticalAlignment="Center" Background="#FFF0F6EC">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Tag}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Tag}" FontSize="10.5" Foreground="#FF4B7A3F" />
+                                </Border>
+                                <TextBlock Grid.Column="2" Text="{Binding Text}" FontSize="13"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                           Margin="9,0,8,0" Foreground="{StaticResource BrushTextPrimary}" />
+                                <Button Grid.Column="3" Style="{StaticResource IconButtonStyle}"
+                                        Content="&#xE74D;" Width="26" Height="26" FontSize="12"
+                                        ToolTip="删除这条事项"
+                                        Command="{Binding DataContext.RemoveTaskCommand, ElementName=MainRoot}"
+                                        CommandParameter="{Binding Id}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Grid>
+
+        <!-- ============ 输入行 ============ -->
+        <Border Grid.Row="7" Style="{StaticResource CardStyle}" Padding="10,8" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox ItemsSource="{Binding TagOptions}" SelectedItem="{Binding SelectedTag}"
+                          DisplayMemberPath="Text" Width="78" Height="30" Margin="0,0,8,0"
+                          VerticalAlignment="Center" FontSize="11.5" />
+                <TextBox Grid.Column="1" Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                         BorderThickness="0" Background="Transparent" FontSize="13"
+                         VerticalContentAlignment="Center"
+                         ToolTip="输入「我在做什么」，回车即可添加">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding AddTaskCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+                <TextBlock Grid.Column="1" Text="记录一下你在做什么，回车添加…" IsHitTestVisible="False"
+                           Margin="9,0,0,0" VerticalAlignment="Center" FontSize="13"
+                           Foreground="{StaticResource BrushTextTertiary}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding InputText}" Value="">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Button Grid.Column="2" Content="添加" Command="{Binding AddTaskCommand}"
+                        Style="{StaticResource AccentButtonStyle}" MinWidth="62" Height="32" Margin="8,0,0,0" />
+            </Grid>
+        </Border>
+
+        <!-- ============ 底部动作 ============ -->
+        <Grid Grid.Row="8" Margin="0,12,0,0">
+            <Button Content="生成工作汇报" Command="{Binding GenerateReportCommand}"
+                    Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" MinWidth="116" Margin="0" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="日报预览" Command="{Binding OpenPreviewCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" />
+                <Button Content="隐藏桌宠" Command="{Binding TogglePetCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" Margin="0" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

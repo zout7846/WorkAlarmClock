@@ -1,0 +1,17 @@
+<UserControl x:Class="WorkAlarmClock.Views.TimeComboBox"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <ComboBox x:Name="TimeSelector"
+              IsEditable="False"
+              HorizontalAlignment="Stretch"
+              VerticalContentAlignment="Center"
+              SelectionChanged="OnSelectionChanged">
+        <ComboBox.ItemTemplate>
+            <DataTemplate>
+                <!-- 24 小时制，避免跟随系统区域设置显示 AM/PM -->
+                <TextBlock Text="{Binding StringFormat='{}{0:HH\:mm}'}" />
+            </DataTemplate>
+        </ComboBox.ItemTemplate>
+    </ComboBox>
+</UserControl>

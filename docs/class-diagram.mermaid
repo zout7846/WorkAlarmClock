@@ -1,0 +1,336 @@
+%% WorkAlarmClock — 核心类图（classDiagram）
+%% 依赖方向：ViewModel → Service → Models / Infrastructure
+
+classDiagram
+    direction TB
+
+    class WorkState {
+        <<enumeration>>
+        BeforeWork
+        Working
+        Resting
+        OffWork
+    }
+    class TriggerSource {
+        <<enumeration>>
+        Schedule
+        Manual
+        Lock
+        Idle
+        System
+    }
+    class RestSource {
+        <<enumeration>>
+        Lunch
+        LockScreen
+        Idle
+        Manual
+    }
+    class ReminderKind {
+        <<enumeration>>
+        Weak
+        Strong
+    }
+
+    class AppSettings {
+        +TimeOnly WorkStartTime
+        +TimeOnly WorkEndTime
+        +bool LunchEnabled
+        +TimeOnly LunchStartTime
+        +TimeOnly LunchEndTime
+        +bool[] Workdays
+        +bool WeakReminderEnabled
+        +int WeakReminderLeadMinutes
+        +bool StrongReminderEnabled
+        +int StrongReminderLeadMinutes
+        +bool StrongAllowIgnore
+        +int StrongRepeatIntervalSeconds
+        +int StrongRepeatMaxCount
+        +bool SoundEnabled
+        +int IdleThresholdMinutes
+        +bool LockAsRest
+        +bool CountIdleAsWork
+        +double PetOpacity
+        +string ReportDirectory
+        +string ReportTemplate
+        +bool AutoStart
+        +double PetLeft
+        +double PetTop
+        +AppSettings CreateDefault()$ 
+    }
+
+    class StateTransition {
+        +DateTimeOffset Time
+        +WorkState From
+        +WorkState To
+        +TriggerSource Source
+        +string? Note
+    }
+
+    class WorkTaskItem {
+        +Guid Id
+        +DateTimeOffset Timestamp
+        +string Text
+    }
+
+    class ReportRecord {
+        +DateTimeOffset GeneratedAt
+        +string FilePath
+        +string TomorrowPlan
+        +string Risks
+    }
+
+    class DayRecord {
+        +DateOnly Date
+        +List~StateTransition~ Transitions
+        +List~WorkTaskItem~ Tasks
+        +List~ReportRecord~ Reports
+        +bool ManualEnded
+    }
+
+    class ReminderState {
+        +bool WeakFired
+        +DateTimeOffset? WeakDeferredUntil
+        +bool WeakIgnored
+        +bool StrongFired
+        +bool StrongConfirmed
+        +int StrongRepeatCount
+        +ResetForNewDay()
+    }
+
+    class ITicker {
+        <<interface>>
+        +DateTimeOffset Now
+        +event EventHandler Tick
+        +Start()
+    }
+    class ClockTicker {
+        -DispatcherTimer _timer
+        -Func~DateTimeOffset~ _clockSource
+        +ITicker 实现
+    }
+
+    class ISettingsService {
+        <<interface>>
+        +AppSettings Current
+        +event EventHandler SettingsChanged
+        +ValidationResult Validate(AppSettings)
+        +ValidationResult TryUpdate(AppSettings)
+    }
+    class IStorageService {
+        <<interface>>
+        +LoadSettings() AppSettings
+        +SaveSettings(AppSettings)
+        +LoadDay(DateOnly) DayRecord?
+        +SaveDay(DayRecord)
+        +LoadWeek(DateOnly) IReadOnlyList~DayRecord~
+        +EnsureArchive(DateOnly)
+    }
+    class IScheduleService {
+        <<interface>>
+        +IsWorkday(DateOnly) bool
+        +GetExpectedState(DateTimeOffset) WorkState
+        +GetTodayPoints(DateOnly) IReadOnlyList~SchedulePoint~
+        +NextTransitionAt(DateTimeOffset) DateTimeOffset?
+    }
+    class ITimeTrackingService {
+        <<interface>>
+        +WorkState CurrentState
+        +RestSource? CurrentRestSource
+        +bool ManualEnded
+        +DayRecord Today
+        +TimeSpan WorkDuration
+        +TimeSpan RestDuration
+        +event EventHandler~WorkState~ StateChanged
+        +event EventHandler TasksChanged
+        +LoadOrCreateToday()
+        +ApplySchedulePoint(SchedulePointKind)
+        +TryManualSwitch(WorkState, out string?) bool
+        +OnLocked()
+        +OnUnlocked()
+        +OnIdleDetected()
+        +OnActivityResumed()
+        +AddTask(string)
+        +RemoveTask(Guid) bool
+        +RefreshDurations()
+    }
+    class IIdleMonitorService {
+        <<interface>>
+        +bool IsLocked
+        +bool IsIdle
+        +TimeSpan CurrentIdleSpan
+        +event EventHandler Locked
+        +event EventHandler Unlocked
+        +event EventHandler IdleDetected
+        +event EventHandler ActivityResumed
+        +Start()
+        +Stop()
+    }
+    class IReminderService {
+        <<interface>>
+        +ReminderState State
+        +event EventHandler~ReminderKind~ ReminderDue
+        +Start()
+        +Stop()
+        +DeferWeak(TimeSpan)
+        +IgnoreWeak()
+        +AcknowledgeStrong()
+        +OnReportGenerated()
+        +ResetForNewDay()
+    }
+    class IReportService {
+        <<interface>>
+        +RenderMarkdown(string, string) string
+        +Generate(string, string) ReportRecord
+        +CopyToClipboard(string) bool
+        +ResolveReportDirectory() string
+        +GetReportPath(DateOnly) string
+    }
+    class INotificationService {
+        <<interface>>
+        +ShowBubble(string, BubbleKind, string?, Action?)
+        +ShowTrayBalloon(string, string)
+        +PlaySound(SoundKind)
+        +UpdateTray(WorkState, string)
+        +InitializeTray(TrayMenuCallbacks)
+        +ShowMainPanel()
+    }
+    class IStatisticsService {
+        <<interface>>
+        +GetStats() WeekStats
+    }
+    class IAutoStartService {
+        <<interface>>
+        +IsEnabled() bool
+        +SetEnabled(bool)
+    }
+
+    class AppServices {
+        <<utility>>
+        +ITicker Ticker
+        +ISettingsService Settings
+        +IStorageService Storage
+        +IScheduleService Schedule
+        +IIdleMonitorService IdleMonitor
+        +ITimeTrackingService TimeTracking
+        +IReminderService Reminder
+        +IReportService Report
+        +INotificationService Notification
+        +IStatisticsService Statistics
+        +IAutoStartService AutoStart
+        +Initialize()$ 
+        +Shutdown()$ 
+    }
+
+    class ObservableObject {
+        +INotifyPropertyChanged 实现
+        +SetProperty~T~(ref T, T, string?) bool
+    }
+    class RelayCommand {
+        -Action _execute
+        -Func~bool~? _canExecute
+        +Execute(object?)
+        +CanExecute(object?) bool
+        +RaiseCanExecuteChanged()
+    }
+
+    class PetViewModel {
+        +string TimeText
+        +string WorkDurationText
+        +string StateText
+        +string BubbleText
+        +Brush StatusDotColor
+        +OpenMainPanelCommand
+    }
+    class MainViewModel {
+        +ObservableCollection~WorkTaskItem~ Tasks
+        +string InputText
+        +WeekStats Stats
+        +StartWorkCommand
+        +StartRestCommand
+        +EndDayCommand
+        +AddTaskCommand
+        +RemoveTaskCommand
+        +GenerateReportCommand
+        +OpenPreviewCommand
+        +OpenStatsCommand
+        +OpenSettingsCommand
+    }
+    class SettingsViewModel {
+        +AppSettings Draft
+        +string? ValidationError
+        +SaveCommand
+        +CancelCommand
+    }
+    class ReportPreviewViewModel {
+        +string PreviewText
+        +string TomorrowPlan
+        +string Risks
+        +RegenerateCommand
+        +CopyCommand
+        +OpenFolderCommand
+    }
+    class StrongReminderViewModel {
+        +string NowText
+        +string WorkDurationText
+        +string ReportStatusText
+        +ConfirmCommand
+    }
+
+    class App {
+        -Mutex _singleInstance
+        +OnStartup()
+        +OnExit()
+    }
+
+    %% 关系
+    ObservableObject <|-- PetViewModel
+    ObservableObject <|-- MainViewModel
+    ObservableObject <|-- SettingsViewModel
+    ObservableObject <|-- ReportPreviewViewModel
+    ObservableObject <|-- StrongReminderViewModel
+    RelayCommand <-- PetViewModel
+    RelayCommand <-- MainViewModel
+
+    DayRecord o-- StateTransition : Transitions 只追加
+    DayRecord o-- WorkTaskItem : Tasks
+    DayRecord o-- ReportRecord : Reports
+    StateTransition --> WorkState
+    StateTransition --> TriggerSource
+    ReminderState --> ReminderKind
+
+    AppServices --> ITimeTrackingService
+    AppServices --> IScheduleService
+    AppServices --> IIdleMonitorService
+    AppServices --> IReminderService
+    AppServices --> IReportService
+    AppServices --> INotificationService
+    AppServices --> ISettingsService
+    AppServices --> IStorageService
+    AppServices --> IStatisticsService
+    AppServices --> IAutoStartService
+    AppServices --> ITicker
+
+    ITicker <|.. ClockTicker
+    ISettingsService <|.. SettingsService
+    IStorageService <|.. StorageService
+    IScheduleService <|.. ScheduleService
+    ITimeTrackingService <|.. TimeTrackingService
+    IIdleMonitorService <|.. IdleMonitorService
+    IReminderService <|.. ReminderService
+    IReportService <|.. ReportService
+    INotificationService <|.. NotificationService
+    IStatisticsService <|.. StatisticsService
+    IAutoStartService <|.. AutoStartService
+
+    AppServices ..> App : 由 App.OnStartup 调用
+    App --> PetViewModel
+    App --> MainViewModel
+
+    TimeTrackingService ..> DayRecord : Replay 幂等重算
+    ScheduleService ..> AppSettings
+    ReminderService ..> ReminderState
+    StorageService ..> AppSettings : settings.json
+    StorageService ..> DayRecord : data/yyyy-MM-dd.json
+    ReportService ..> DayRecord : Reports 追加
+    NotificationService ..> WorkState : 托盘图标状态色

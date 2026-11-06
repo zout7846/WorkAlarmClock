@@ -1,0 +1,68 @@
+<Window x:Class="WorkAlarmClock.Views.ScreenshotOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="截图"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="Manual"
+        Cursor="Cross"
+        Focusable="True"
+        KeyDown="OnWindowKeyDown"
+        MouseRightButtonUp="OnWindowRightButtonUp"
+        MouseLeftButtonDown="OnMouseDown"
+        MouseMove="OnMouseMove"
+        MouseLeftButtonUp="OnMouseUp">
+
+    <Grid x:Name="Root" Background="Transparent" ClipToBounds="True">
+        <!-- 冻结的屏幕快照（选区外被半透明遮罩压暗） -->
+        <Image x:Name="Frozen" Stretch="Fill" />
+
+        <Canvas x:Name="Layer">
+            <Rectangle x:Name="ShadeTop" Fill="#73000000" IsHitTestVisible="False" />
+            <Rectangle x:Name="ShadeBottom" Fill="#73000000" IsHitTestVisible="False" />
+            <Rectangle x:Name="ShadeLeft" Fill="#73000000" IsHitTestVisible="False" />
+            <Rectangle x:Name="ShadeRight" Fill="#73000000" IsHitTestVisible="False" />
+
+            <Rectangle x:Name="SelectionRect"
+                       Stroke="#FF2F80ED" StrokeThickness="1.6"
+                       StrokeDashArray="5 3"
+                       Visibility="Collapsed"
+                       IsHitTestVisible="False" />
+
+            <!-- 悬停窗口高亮（窗口截图模式） -->
+            <Rectangle x:Name="WindowHighlight"
+                       Stroke="#FF3B7DF6" StrokeThickness="2.4"
+                       Fill="#223B7DF6"
+                       Visibility="Collapsed"
+                       IsHitTestVisible="False" />
+
+            <Border x:Name="WindowTitle"
+                    Background="#E6111827" CornerRadius="6" Padding="8,3"
+                    Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="WindowTitleText" Foreground="#FFF2F6FB" FontSize="12" />
+            </Border>
+
+            <Border x:Name="SizeLabel"
+                    Background="#E6111827" CornerRadius="6" Padding="8,3"
+                    Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="SizeText" Foreground="#FFF2F6FB" FontSize="12" />
+            </Border>
+        </Canvas>
+
+        <!-- 顶部操作提示 -->
+        <Border x:Name="HintBar"
+                Background="#E6111827" CornerRadius="10" Padding="14,8"
+                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,22,0,0"
+                IsHitTestVisible="False">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="拖拽选区，或单击某个窗口直接截取" Foreground="#FFFFFFFF" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="松开鼠标完成 · Esc / 右键取消" Foreground="#FFB9C4D2" FontSize="12"
+                           Margin="12,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

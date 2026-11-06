@@ -1,0 +1,289 @@
+﻿<Window x:Class="WorkAlarmClock.PetWindow"
+        x:Name="PetRoot"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:WorkAlarmClock.Views"
+        Title="WorkAlarmClock 桌宠"
+        SizeToContent="WidthAndHeight"
+        MinWidth="120"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Focusable="False"
+        FontFamily="Microsoft YaHei UI"
+        Opacity="{Binding PetOpacity}"
+        Loaded="OnWindowLoaded"
+        Closed="OnWindowClosed"
+        MouseEnter="OnWindowMouseEnter"
+        MouseLeave="OnWindowMouseLeave"
+        MouseDoubleClick="OnWindowMouseDoubleClick"
+        PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
+        PreviewMouseMove="OnPreviewMouseMove"
+        PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <Window.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="打开主面板" Command="{Binding OpenMainPanelCommand}" />
+            <Separator />
+            <MenuItem Header="开始工作" Command="{Binding StartWorkCommand}" />
+            <MenuItem Header="开始休息" Command="{Binding StartRestCommand}" />
+            <MenuItem Header="结束当天" Command="{Binding EndDayCommand}" />
+            <Separator />
+            <MenuItem Header="开始/停止专注" Command="{Binding FocusToggleCommand}" />
+            <MenuItem Header="生成工作汇报" Command="{Binding GenerateReportCommand}" />
+            <MenuItem Header="区域截图" Command="{Binding ScreenshotCommand}" />
+            <MenuItem Header="工作统计" Command="{Binding OpenStatisticsCommand}" />
+            <MenuItem Header="历史日报" Command="{Binding OpenHistoryCommand}" />
+            <MenuItem Header="设置" Command="{Binding OpenSettingsCommand}" />
+            <Separator />
+            <MenuItem Header="退出" Command="{Binding ExitCommand}" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <Grid x:Name="Root" Background="Transparent" RenderTransformOrigin="0.5,0.9">
+        <Grid.RenderTransform>
+            <TransformGroup>
+                <ScaleTransform x:Name="HoverScale" ScaleX="1" ScaleY="1" />
+                <TranslateTransform x:Name="HoverLift" Y="0" />
+            </TransformGroup>
+        </Grid.RenderTransform>
+
+        <!-- 贴边收缩后的圆形斑点 -->
+        <Grid x:Name="CollapseDot"
+              Width="28" Height="28"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Center"
+              Visibility="Collapsed"
+              Opacity="0"
+              RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+                <ScaleTransform x:Name="DotScale" ScaleX="0.4" ScaleY="0.4" />
+            </Grid.RenderTransform>
+            <Ellipse Stroke="#CCFFFFFF" StrokeThickness="2">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.35,0.3">
+                        <GradientStop Color="#FFFFFFFF" Offset="0" />
+                        <GradientStop Color="#FF6E8BFF" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+            <Ellipse x:Name="DotPulse" Margin="3" Opacity="0.35">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#FFB7C8FF" Offset="0" />
+                        <GradientStop Color="#008FB6FF" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+        </Grid>
+
+        <!-- 展开态 -->
+        <StackPanel x:Name="PetBody"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="10,6,10,14">
+
+            <!-- 气泡 + 小尾巴 -->
+            <Grid Margin="0,0,0,0">
+                <Border x:Name="BubbleBorder"
+                        MaxWidth="204"
+                        Padding="11,9"
+                        CornerRadius="14"
+                        Background="#FAFFFFFF"
+                        BorderBrush="#FFE2EBF7"
+                        BorderThickness="1"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,0,8">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.18" Color="#FF2B4A7A" />
+                    </Border.Effect>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BubbleVisible}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.24" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.42" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                    <Setter Property="IsHitTestVisible" Value="True" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Text="{Binding BubbleText}"
+                                   FontSize="12.5"
+                                   LineHeight="18"
+                                   TextWrapping="Wrap"
+                                   Foreground="#FF1B2733" />
+                        <ItemsControl ItemsSource="{Binding BubbleActions}" Margin="0,8,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding Label}"
+                                            Margin="0,0,6,0"
+                                            Padding="9,3"
+                                            FontSize="11"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            MinWidth="0" Height="26"
+                                            Command="{Binding DataContext.BubbleActionCommand, ElementName=PetRoot}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="{Binding BubbleActionLabel}"
+                                Margin="0,8,0,0"
+                                FontSize="11"
+                                HorizontalAlignment="Left"
+                                MinWidth="0" Height="26" Padding="10,0"
+                                Command="{Binding DataContext.BubbleActionCommand, ElementName=PetRoot}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding BubbleActionLabel}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- 气泡小尾巴 -->
+                <Path Data="M0,0 L14,0 L4,9 Z"
+                      Fill="#FAFFFFFF" Stroke="#FFE2EBF7" StrokeThickness="1"
+                      HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                      Margin="28,0,0,-1">
+                    <Path.Style>
+                        <Style TargetType="Path">
+                            <Setter Property="Opacity" Value="0" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BubbleVisible}" Value="True">
+                                    <Setter Property="Opacity" Value="1" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+            </Grid>
+
+            <!-- 时钟卡 -->
+            <Border Width="138" CornerRadius="18" Padding="13,10"
+                    HorizontalAlignment="Center"
+                    BorderBrush="#FFE4ECF8" BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0.4,1">
+                        <GradientStop Color="#FDFFFFFF" Offset="0" />
+                        <GradientStop Color="#F4F1F7FF" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="5" Direction="270" Opacity="0.22" Color="#FF2B4A7A" />
+                </Border.Effect>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="{Binding TimeText}"
+                               FontSize="26" FontWeight="Bold"
+                               FontFamily="Segoe UI Semibold"
+                               Foreground="#FF16202B" />
+                    <Border CornerRadius="8" Padding="7,3"
+                            HorizontalAlignment="Left" Margin="0,4,0,0">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#FFE9F2FF" Offset="0" />
+                                <GradientStop Color="#FFDDE9FF" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock FontSize="10.5" Foreground="{StaticResource BrushAccentDeep}">
+                            <Run Text="已工作" />
+                            <Run Text="{Binding WorkDurationText, Mode=OneWay}" FontWeight="Bold" />
+                        </TextBlock>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 番茄钟倒计时胶囊（仅在计时中显示） -->
+            <Border CornerRadius="9" Padding="9,3" HorizontalAlignment="Center" Margin="0,7,0,0"
+                    Background="#FFFFF2F0" BorderBrush="#FFFFDAD4" BorderThickness="1"
+                    Visibility="{Binding IsFocusChipVisible, Converter={StaticResource BoolToVis}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                               Foreground="#FFE0503F" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding FocusChipText}" FontSize="10.5" FontWeight="SemiBold"
+                               Foreground="#FFE0503F" Margin="5,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- 卡通角色 -->
+            <views:PetAvatarControl x:Name="PetAvatar"
+                                    Width="150" Height="215"
+                                    Margin="0,2,0,0"
+                                    HorizontalAlignment="Left"
+                                    CurrentState="{Binding CurrentState}"
+                                    RestSourceValue="{Binding CurrentRestSource}"
+                                    ReminderOverlay="{Binding ReminderOverlay}"
+                                    Species="{Binding Species}"
+                                    FurGradient="{Binding FurGradient}"
+                                    FurSolid="{Binding FurSolid}"
+                                    FurLight="{Binding FurLight}"
+                                    FurOutline="{Binding FurOutline}"
+                                    EarInner="{Binding EarInner}"
+                                    Blush="{Binding Blush}"
+                                    NoseColor="{Binding NoseColor}" />
+
+            <!-- 状态胶囊 + 亲密度等级 -->
+            <StackPanel Orientation="Horizontal" Margin="0,-2,0,0" HorizontalAlignment="Center">
+                <Border CornerRadius="10" Padding="8,3.5"
+                        Background="#F7FFFFFF" BorderBrush="#FFE4ECF8" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="9" Height="9"
+                                 Fill="{Binding StateDotBrush}"
+                                 VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding StateText}"
+                                   FontSize="11.5"
+                                   Margin="6,0,0,0"
+                                   Foreground="#FF1B2733"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="10" Padding="7,3.5" Margin="5,0,0,0"
+                        BorderBrush="#FFE9E3FB" BorderThickness="1">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FFF6F2FF" Offset="0" />
+                            <GradientStop Color="#FFEDE4FF" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="{Binding LevelBadge}" FontSize="10.5"
+                               Foreground="#FF6C5CE0" VerticalAlignment="Center" />
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

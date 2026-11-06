@@ -1,0 +1,77 @@
+<Window x:Class="WorkAlarmClock.Views.ReportPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="工作汇报预览"
+        Width="792" Height="523"
+        MinWidth="660" MinHeight="440"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BrushPanelGradient}"
+        FontFamily="Microsoft YaHei UI">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="工作日报预览（纯文本，编辑右侧内容后点击「重新生成」即可用新内容落盘）"
+                   Style="{StaticResource HintTextStyle}" Margin="0,0,0,8" />
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="280" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 左：日报纯文本预览 -->
+            <Border CornerRadius="8" Background="{StaticResource BrushCardBackground}"
+                    BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" Padding="10">
+                <TextBox Text="{Binding PreviewText, Mode=OneWay}"
+                         IsReadOnly="True" Background="Transparent" BorderThickness="0"
+                         FontFamily="Consolas" FontSize="12.5"
+                         VerticalContentAlignment="Top"
+                         VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"
+                         HorizontalScrollBarVisibility="Disabled" />
+            </Border>
+
+            <!-- 右：元信息与编辑（可滚动，窗口变矮时不裁切） -->
+            <ScrollViewer Grid.Column="1" Margin="12,0,0,0" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                <TextBlock Text="保存到" Style="{StaticResource SectionTitleStyle}" />
+                <TextBlock Text="{Binding SavePathText}" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{StaticResource BrushTextSecondary}" Margin="0,0,0,12" />
+                <TextBlock Text="今日工作" Style="{StaticResource SectionTitleStyle}" />
+                <TextBox Text="{Binding TodayWork, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="88"
+                         VerticalScrollBarVisibility="Auto" Margin="0,0,0,4" />
+                <TextBlock Text="留空则自动汇总主面板记录的事项流水"
+                           Style="{StaticResource HintTextStyle}" Margin="0,0,0,10" />
+                <TextBlock Text="明日计划" Style="{StaticResource SectionTitleStyle}" />
+                <TextBox Text="{Binding TomorrowPlan, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="60"
+                         VerticalScrollBarVisibility="Auto" Margin="0,0,0,12" />
+
+                <TextBlock Text="风险与待办" Style="{StaticResource SectionTitleStyle}" />
+                <TextBox Text="{Binding Risks, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="60"
+                         VerticalScrollBarVisibility="Auto" Margin="0,0,0,12" />
+
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="生成" Command="{Binding RegenerateCommand}"
+                            Padding="12,4" Cursor="Hand" Margin="0,0,8,0" Width="60" />
+                    <Button Content="复制" Command="{Binding CopyCommand}"
+                            Padding="12,4" Cursor="Hand" Margin="0,0,8,0" Width="60" />
+                    <Button Content="目录" Command="{Binding OpenFolderCommand}"
+                            Padding="12,4" Cursor="Hand" Margin="0,0,8,0" Width="60" />
+                    <Button Content="关闭" Command="{Binding CloseCommand}"
+                            Padding="12,4" Cursor="Hand" Margin="0,0,8,0" Width="60" />
+                </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <TextBlock Grid.Row="2" Text="提示：重新生成会直接覆盖同名 .txt 文件（同日不保留 .bak 备份）。"
+                   Style="{StaticResource HintTextStyle}" Margin="0,10,0,0" />
+    </Grid>
+</Window>
