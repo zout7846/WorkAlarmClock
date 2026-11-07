@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using WorkAlarmClock.Infrastructure;
 using WorkAlarmClock.Models;
 using WorkAlarmClock.Services;
@@ -20,10 +23,14 @@ public sealed class PetViewModel : ObservableObject
     /// <summary>提醒表情叠加显示时长（秒）。</summary>
     private const int OverlaySeconds = 60;
 
+    /// <summary>活动结束后灵动岛保留文案的时长（秒），可被新活动打断。</summary>
+    private const int ActivityHoldSeconds = 3;
+
     private string _timeText = "--:--";
     private string _workDurationText = "00:00";
     private string _stateText = "待上班";
     private Brush _stateDotBrush = Brushes.Gray;
+    private Brush _stateGlowBrush = Brushes.Transparent;
     private string _bubbleText = string.Empty;
     private bool _bubbleVisible;
     private string? _bubbleActionLabel;
@@ -65,6 +72,19 @@ public sealed class PetViewModel : ObservableObject
     private Brush _blush = Brushes.LightPink;
     private Brush _noseColor = Brushes.PaleVioletRed;
     private string _levelBadge = "Lv.1 初见";
+
+    private string _islandTaskText = "今日 0 条";
+
+    private bool _isCameraInUse;
+    private bool _isMicInUse;
+    private bool _isMediaPlaying;
+    private bool _isCapturing;
+
+    private string _islandActivityText = string.Empty;
+    private Brush _islandActivityBrush = Brushes.LightSteelBlue;
+    private bool _islandActivityVisible;
+    private readonly DispatcherTimer _activityHoldTimer;
+
     private DateTimeOffset _lastInteractionAt = DateTimeOffset.MinValue;
     private DateTimeOffset _lastPersistAt = DateTimeOffset.MinValue;
     private readonly Random _random = new Random();
@@ -73,6 +93,11 @@ public sealed class PetViewModel : ObservableObject
     public PetViewModel()
     {
         BubbleActions = new ObservableCollection<BubbleAction>();
+        _activityHoldTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(ActivityHoldSeconds)
+        };
+        _activityHoldTimer.Tick += (_, _) => ClearIslandActivity();
 
         OpenMainPanelCommand = new RelayCommand(() => AppServices.Notification.ShowMainPanel());
         BubbleActionCommand = new RelayCommand(ExecuteBubbleAction);
@@ -99,6 +124,8 @@ public sealed class PetViewModel : ObservableObject
         AppServices.BubbleRequested += OnBubbleRequested;
         AppServices.LiveOpacityPreview += OnLiveOpacityPreview;
         AppServices.Focus.StateChanged += OnFocusChanged;
+        AppServices.SystemStatus.StatusChanged += OnSystemStatusChanged;
+        RefreshSystemStatus();
 
         RefreshFromServices();
         RefreshFocusChip();
@@ -130,6 +157,34 @@ public sealed class PetViewModel : ObservableObject
     {
         get => _stateDotBrush;
         private set => SetProperty(ref _stateDotBrush, value);
+    }
+
+    /// <summary>状态文字背后的柔和光晕（径向渐变，颜色跟随状态色）。</summary>
+    public Brush StateGlowBrush
+    {
+        get => _stateGlowBrush;
+        private set => SetProperty(ref _stateGlowBrush, value);
+    }
+
+    /// <summary>灵动岛活动文案（"微信 · 摄像头"），无活动时为空。</summary>
+    public string IslandActivityText
+    {
+        get => _islandActivityText;
+        private set => SetProperty(ref _islandActivityText, value);
+    }
+
+    /// <summary>灵动岛活动文案颜色（按活动类型着色）。</summary>
+    public Brush IslandActivityBrush
+    {
+        get => _islandActivityBrush;
+        private set => SetProperty(ref _islandActivityBrush, value);
+    }
+
+    /// <summary>是否显示灵动岛活动文案。</summary>
+    public bool IslandActivityVisible
+    {
+        get => _islandActivityVisible;
+        private set => SetProperty(ref _islandActivityVisible, value);
     }
 
     /// <summary>气泡文本（空表示无气泡）。</summary>
@@ -225,6 +280,41 @@ public sealed class PetViewModel : ObservableObject
     public int Intimacy => _intimacy;
 
     private bool _isFocusChipVisible;
+    /// <summary>摄像头占用中。</summary>
+    public bool IsCameraInUse
+    {
+        get => _isCameraInUse;
+        private set => SetProperty(ref _isCameraInUse, value);
+    }
+
+    /// <summary>麦克风占用中。</summary>
+    public bool IsMicInUse
+    {
+        get => _isMicInUse;
+        private set => SetProperty(ref _isMicInUse, value);
+    }
+
+    /// <summary>正在播放音频。</summary>
+    public bool IsMediaPlaying
+    {
+        get => _isMediaPlaying;
+        private set => SetProperty(ref _isMediaPlaying, value);
+    }
+
+    /// <summary>正在截图。</summary>
+    public bool IsCapturing
+    {
+        get => _isCapturing;
+        private set => SetProperty(ref _isCapturing, value);
+    }
+
+    /// <summary>灵动岛：今日记录条数文案。</summary>
+    public string IslandTaskText
+    {
+        get => _islandTaskText;
+        private set => SetProperty(ref _islandTaskText, value);
+    }
+
     private string _focusChipText = string.Empty;
 
     /// <summary>当前皮肤序号（0–3）。</summary>
@@ -438,6 +528,7 @@ public sealed class PetViewModel : ObservableObject
         DateTimeOffset now = AppServices.Ticker.Now;
         TimeText = TextFormats.TimeToHm(now);
         WorkDurationText = TextFormats.DurationToHm(AppServices.TimeTracking.WorkDuration);
+        RefreshIslandTaskText();
 
         if (_bubbleExpireAt.HasValue && now >= _bubbleExpireAt.Value)
         {
@@ -452,6 +543,156 @@ public sealed class PetViewModel : ObservableObject
     }
 
     private void OnStateChanged(object? sender, WorkState state) => RefreshFromServices();
+
+    private void OnSystemStatusChanged(object? sender, EventArgs e) => RefreshSystemStatus();
+
+    /// <summary>同步摄像头 / 麦克风 / 音频 / 截图状态，并刷新灵动岛的活动文案。</summary>
+    private void RefreshSystemStatus()
+    {
+        try
+        {
+            IsCameraInUse = AppServices.SystemStatus.CameraInUse;
+            IsMicInUse = AppServices.SystemStatus.MicInUse;
+            IsMediaPlaying = AppServices.SystemStatus.MediaPlaying;
+            IsCapturing = AppServices.SystemStatus.Capturing;
+        }
+        catch (Exception)
+        {
+            // 状态探测失败时保持上一次结果。
+        }
+
+        RefreshIslandActivity();
+    }
+
+    /// <summary>
+    /// 刷新灵动岛「活动状态 + 程序」文案：活动出现立即显示并打断旧的 3 秒残留倒计时，
+    /// 活动结束则保留 3 秒后再消失（新活动同样可以打断这个倒计时）。
+    /// </summary>
+    private void RefreshIslandActivity()
+    {
+        IReadOnlyList<SystemActivity> activities;
+        try
+        {
+            activities = AppServices.SystemStatus.Activities;
+        }
+        catch (Exception)
+        {
+            activities = Array.Empty<SystemActivity>();
+        }
+
+        if (activities.Count == 0)
+        {
+            if (IslandActivityVisible)
+            {
+                _activityHoldTimer.Stop();
+                _activityHoldTimer.Start();
+            }
+
+            return;
+        }
+
+        _activityHoldTimer.Stop();
+        IslandActivityText = ComposeActivityText(activities);
+        IslandActivityBrush = ResolveActivityBrush(activities[0].Kind);
+        IslandActivityVisible = true;
+    }
+
+    /// <summary>3 秒残留倒计时结束：清掉活动文案。</summary>
+    private void ClearIslandActivity()
+    {
+        _activityHoldTimer.Stop();
+        IslandActivityText = string.Empty;
+        IslandActivityVisible = false;
+    }
+
+    /// <summary>把活动列表拼成「程序 · 摄像头/麦克风」，多程序时追加 +N。</summary>
+    private static string ComposeActivityText(IReadOnlyList<SystemActivity> activities)
+    {
+        SystemActivity primary = activities[0];
+        string primaryProgram = primary.Program ?? string.Empty;
+        var labels = new List<string>(4);
+        var otherPrograms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (SystemActivity activity in activities)
+        {
+            string program = activity.Program ?? string.Empty;
+            if (!string.Equals(program, primaryProgram, StringComparison.OrdinalIgnoreCase))
+            {
+                if (program.Length > 0)
+                {
+                    otherPrograms.Add(program);
+                }
+
+                continue;
+            }
+
+            string label = ResolveActivityLabel(activity.Kind);
+            if (!labels.Contains(label))
+            {
+                labels.Add(label);
+            }
+        }
+
+        string labelText = string.Join("/", labels);
+        string text;
+        if (primaryProgram.Length > 0 && labelText.Length > 0)
+        {
+            text = primaryProgram + " · " + labelText;
+        }
+        else if (primaryProgram.Length > 0)
+        {
+            text = primaryProgram;
+        }
+        else
+        {
+            text = labelText;
+        }
+
+        if (otherPrograms.Count > 0)
+        {
+            text += " +" + otherPrograms.Count.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return text;
+    }
+
+    private static string ResolveActivityLabel(SystemActivityKind kind) => kind switch
+    {
+        SystemActivityKind.Camera => "摄像头",
+        SystemActivityKind.Microphone => "麦克风",
+        SystemActivityKind.Media => "音频",
+        SystemActivityKind.Capturing => "截图",
+        _ => string.Empty
+    };
+
+    private static Brush ResolveActivityBrush(SystemActivityKind kind) => kind switch
+    {
+        SystemActivityKind.Camera => CreateFrozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x8B, 0x8B))),
+        SystemActivityKind.Microphone => CreateFrozen(new SolidColorBrush(Color.FromRgb(0xFF, 0xB4, 0x54))),
+        SystemActivityKind.Media => CreateFrozen(new SolidColorBrush(Color.FromRgb(0x6B, 0xD5, 0xA0))),
+        SystemActivityKind.Capturing => CreateFrozen(new SolidColorBrush(Color.FromRgb(0x6B, 0xB8, 0xFF))),
+        _ => Brushes.LightSteelBlue
+    };
+
+    private static Brush CreateFrozen(Brush brush)
+    {
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>刷新灵动岛上的今日记录条数。</summary>
+    private void RefreshIslandTaskText()
+    {
+        try
+        {
+            int count = AppServices.TimeTracking.Today.Tasks.Count;
+            IslandTaskText = count == 0 ? "今日 0 条" : "今日 " + count + " 条";
+        }
+        catch (Exception)
+        {
+            IslandTaskText = "今日 --";
+        }
+    }
 
     private void OnSettingsChanged(object? sender, EventArgs e)
     {
@@ -578,6 +819,7 @@ public sealed class PetViewModel : ObservableObject
         CurrentRestSource = tracking.CurrentRestSource;
         StateText = ScheduleService.StateToText(tracking.CurrentState, tracking.CurrentRestSource);
         StateDotBrush = ResolveBrush(tracking.CurrentState, tracking.CurrentRestSource);
+        StateGlowBrush = ResolveGlowBrush(tracking.CurrentState, tracking.CurrentRestSource);
         WorkDurationText = TextFormats.DurationToHm(tracking.WorkDuration);
         TimeText = TextFormats.TimeToHm(AppServices.Ticker.Now);
         PetOpacity = AppServices.Settings.Current.PetOpacity;
@@ -593,4 +835,27 @@ public sealed class PetViewModel : ObservableObject
             _ => Brushes.SlateGray
         };
     }
+
+    /// <summary>生成状态光晕的径向渐变：中心为状态色（较亮），向外快速渐隐，形成"圆点外扩"的脉冲光晕。</summary>
+    private static Brush ResolveGlowBrush(WorkState state, RestSource? restSource)
+    {
+        Color color = ResolveBrush(state, restSource) is SolidColorBrush solid ? solid.Color : Colors.SlateGray;
+        var brush = new RadialGradientBrush
+        {
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+            GradientOrigin = new Point(0.5, 0.5),
+            Center = new Point(0.5, 0.5),
+            RadiusX = 0.5,
+            RadiusY = 0.5
+        };
+        brush.GradientStops.Clear();
+        brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0xE8), 0.0));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0x7A), 0.35));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0x28), 0.65));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0x00), 1.0));
+        brush.Freeze();
+        return brush;
+    }
+
+    private static Color WithAlpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
 }

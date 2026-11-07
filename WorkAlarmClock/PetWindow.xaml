@@ -1,11 +1,11 @@
-﻿<Window x:Class="WorkAlarmClock.PetWindow"
+<Window x:Class="WorkAlarmClock.PetWindow"
         x:Name="PetRoot"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:WorkAlarmClock.Views"
         Title="WorkAlarmClock 桌宠"
         SizeToContent="WidthAndHeight"
-        MinWidth="120"
+        MinWidth="40"
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
@@ -32,6 +32,8 @@
     <Window.ContextMenu>
         <ContextMenu>
             <MenuItem Header="打开主面板" Command="{Binding OpenMainPanelCommand}" />
+            <MenuItem x:Name="IslandMenuItem" Header="收起为灵动岛" Click="OnToggleIslandClick" />
+            <MenuItem Header="隐藏桌宠" Click="OnHidePetClick" />
             <Separator />
             <MenuItem Header="开始工作" Command="{Binding StartWorkCommand}" />
             <MenuItem Header="开始休息" Command="{Binding StartRestCommand}" />
@@ -56,33 +58,102 @@
             </TransformGroup>
         </Grid.RenderTransform>
 
-        <!-- 贴边收缩后的圆形斑点 -->
-        <Grid x:Name="CollapseDot"
-              Width="28" Height="28"
-              HorizontalAlignment="Left"
+        <!-- 收起态：灵动岛（连续曲率圆角，固定屏幕顶部居中） -->
+        <Grid x:Name="IslandHost"
+              Width="176" Height="38"
+              HorizontalAlignment="Center"
               VerticalAlignment="Center"
               Visibility="Collapsed"
               Opacity="0"
               RenderTransformOrigin="0.5,0.5">
             <Grid.RenderTransform>
-                <ScaleTransform x:Name="DotScale" ScaleX="0.4" ScaleY="0.4" />
+                <ScaleTransform x:Name="IslandScale" ScaleX="1" ScaleY="1" />
             </Grid.RenderTransform>
-            <Ellipse Stroke="#CCFFFFFF" StrokeThickness="2">
-                <Ellipse.Fill>
-                    <RadialGradientBrush GradientOrigin="0.35,0.3">
-                        <GradientStop Color="#FFFFFFFF" Offset="0" />
-                        <GradientStop Color="#FF6E8BFF" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-            <Ellipse x:Name="DotPulse" Margin="3" Opacity="0.35">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#FFB7C8FF" Offset="0" />
-                        <GradientStop Color="#008FB6FF" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
+
+            <!-- 连续曲率（超椭圆）底形，Data 由代码按尺寸生成 -->
+            <Path x:Name="IslandShape" Fill="#F70B0B0E" Stroke="#26FFFFFF" StrokeThickness="1" />
+
+            <Grid x:Name="IslandContent" Margin="16,0,16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 状态文字（替代原状态点），左侧是跟随状态色的圆形脉冲光晕 -->
+                <Grid x:Name="IslandStateCell" Grid.Column="0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse x:Name="IslandGlow" Width="24" Height="24"
+                                 Fill="{Binding StateGlowBrush}"
+                                 VerticalAlignment="Center"
+                                 Opacity="0.8" RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform x:Name="IslandGlowScale" ScaleX="1" ScaleY="1" />
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <TextBlock Text="{Binding StateText}" FontSize="12.5" FontWeight="SemiBold"
+                                   Margin="5,0,0,0"
+                                   Foreground="{Binding StateDotBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Grid.Column="1" Text="{Binding TimeText}" Margin="10,0,0,0"
+                           VerticalAlignment="Center" FontSize="13.5" FontWeight="SemiBold"
+                           FontFamily="Segoe UI Semibold" Foreground="#FFF6F8FB" />
+
+                <!-- 活动状态 + 触发它的程序（活动结束后延迟 3 秒消失） -->
+                <Grid x:Name="IslandActivityCell" Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock x:Name="IslandActivityText" Margin="10,0,0,0"
+                               VerticalAlignment="Center" FontSize="11.5"
+                               Foreground="{Binding IslandActivityBrush}"
+                               Text="{Binding IslandActivityText}"
+                               Visibility="{Binding IslandActivityVisible, Converter={StaticResource BoolToVis}}" />
+                </Grid>
+
+                <!-- 通知弹出文本 -->
+                <TextBlock x:Name="IslandNotifyText" Grid.Column="3" Margin="9,0,0,0"
+                           VerticalAlignment="Center" FontSize="11.5" MaxWidth="190"
+                           TextTrimming="CharacterEllipsis" Foreground="#FFEDF2F8" Opacity="0" />
+
+                <!-- 悬停展开的监控信息 -->
+                <Border x:Name="IslandExtraWrap" Grid.Column="4" Opacity="0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="1" Height="13" Margin="11,0" Background="#33FFFFFF"
+                                VerticalAlignment="Center" />
+                        <TextBlock Text="已工作" FontSize="10.5" VerticalAlignment="Center"
+                                   Foreground="#FF98A4B4" />
+                        <TextBlock Text="{Binding WorkDurationText}" Margin="4,0,0,0" FontSize="10.5"
+                                   FontWeight="Bold" VerticalAlignment="Center" Foreground="#FFE9EFF8" />
+
+                        <Border Width="1" Height="13" Margin="11,0" Background="#33FFFFFF"
+                                VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding IslandTaskText}" FontSize="10.5" VerticalAlignment="Center"
+                                   Foreground="#FFB9C6D6" />
+
+                        <StackPanel x:Name="IslandFocus" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFocusChipVisible}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <Border Width="1" Height="13" Margin="11,0" Background="#33FFFFFF"
+                                    VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                       Foreground="#FFFF8A7A" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding FocusChipText}" FontSize="10.5" FontWeight="SemiBold"
+                                       Foreground="#FFFF8A7A" Margin="4,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- 展开态 -->
@@ -92,110 +163,8 @@
                     VerticalAlignment="Top"
                     Margin="10,6,10,14">
 
-            <!-- 气泡 + 小尾巴 -->
-            <Grid Margin="0,0,0,0">
-                <Border x:Name="BubbleBorder"
-                        MaxWidth="204"
-                        Padding="11,9"
-                        CornerRadius="14"
-                        Background="#FAFFFFFF"
-                        BorderBrush="#FFE2EBF7"
-                        BorderThickness="1"
-                        HorizontalAlignment="Left"
-                        Margin="0,0,0,8">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.18" Color="#FF2B4A7A" />
-                    </Border.Effect>
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Opacity" Value="0" />
-                            <Setter Property="IsHitTestVisible" Value="False" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding BubbleVisible}" Value="True">
-                                    <DataTrigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.24" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </DataTrigger.EnterActions>
-                                    <DataTrigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.42" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </DataTrigger.ExitActions>
-                                    <Setter Property="IsHitTestVisible" Value="True" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <StackPanel Orientation="Vertical">
-                        <TextBlock Text="{Binding BubbleText}"
-                                   FontSize="12.5"
-                                   LineHeight="18"
-                                   TextWrapping="Wrap"
-                                   Foreground="#FF1B2733" />
-                        <ItemsControl ItemsSource="{Binding BubbleActions}" Margin="0,8,0,0">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Content="{Binding Label}"
-                                            Margin="0,0,6,0"
-                                            Padding="9,3"
-                                            FontSize="11"
-                                            Style="{StaticResource PrimaryButtonStyle}"
-                                            MinWidth="0" Height="26"
-                                            Command="{Binding DataContext.BubbleActionCommand, ElementName=PetRoot}"
-                                            CommandParameter="{Binding}" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <Button Content="{Binding BubbleActionLabel}"
-                                Margin="0,8,0,0"
-                                FontSize="11"
-                                HorizontalAlignment="Left"
-                                MinWidth="0" Height="26" Padding="10,0"
-                                Command="{Binding DataContext.BubbleActionCommand, ElementName=PetRoot}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding BubbleActionLabel}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-                    </StackPanel>
-                </Border>
-
-                <!-- 气泡小尾巴 -->
-                <Path Data="M0,0 L14,0 L4,9 Z"
-                      Fill="#FAFFFFFF" Stroke="#FFE2EBF7" StrokeThickness="1"
-                      HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                      Margin="28,0,0,-1">
-                    <Path.Style>
-                        <Style TargetType="Path">
-                            <Setter Property="Opacity" Value="0" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding BubbleVisible}" Value="True">
-                                    <Setter Property="Opacity" Value="1" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Path.Style>
-                </Path>
-            </Grid>
-
-            <!-- 时钟卡 -->
-            <Border Width="138" CornerRadius="18" Padding="13,10"
+            <!-- 时钟卡（对话合入卡内，取代独立气泡） -->
+            <Border Width="152" CornerRadius="18" Padding="12,9"
                     HorizontalAlignment="Center"
                     BorderBrush="#FFE4ECF8" BorderThickness="1">
                 <Border.Background>
@@ -225,6 +194,75 @@
                             <Run Text="{Binding WorkDurationText, Mode=OneWay}" FontWeight="Bold" />
                         </TextBlock>
                     </Border>
+
+                    <!-- 对话（BubbleVisible 时在卡内展开） -->
+                    <StackPanel x:Name="BubblePanel" Margin="0,7,0,0" MaxWidth="128">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Setter Property="Opacity" Value="0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding BubbleVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1"
+                                                                     Duration="0:0:0.22" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <Border Height="1" Background="#FFE9F0F9" Margin="0,0,0,6" />
+
+                        <TextBlock Text="{Binding BubbleText}"
+                                   FontSize="11.5"
+                                   LineHeight="16"
+                                   TextWrapping="Wrap"
+                                   Foreground="#FF3C4A59" />
+
+                        <ItemsControl ItemsSource="{Binding BubbleActions}" Margin="0,6,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding Label}"
+                                            Margin="0,0,5,0"
+                                            Padding="8,2"
+                                            FontSize="10.5"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            MinWidth="0" Height="23"
+                                            Command="{Binding DataContext.BubbleActionCommand, ElementName=PetRoot}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Button Content="{Binding BubbleActionLabel}"
+                                Margin="0,6,0,0"
+                                FontSize="10.5"
+                                HorizontalAlignment="Left"
+                                MinWidth="0" Height="23" Padding="9,0"
+                                Command="{Binding DataContext.BubbleActionCommand, ElementName=PetRoot}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding BubbleActionLabel}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

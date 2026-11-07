@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,6 +15,7 @@ namespace WorkAlarmClock
     public partial class App : System.Windows.Application, IHotkeyActions
     {
         private static Mutex? _singleInstanceMutex;
+        private bool _ownsMutex;
         private static MainViewModel? _mainViewModel;
         private static MainWindow? _mainWindow;
         private static PetWindow? _petWindow;
@@ -26,6 +27,7 @@ namespace WorkAlarmClock
         protected override void OnStartup(StartupEventArgs e)
         {
             _singleInstanceMutex = new Mutex(true, AppEnvironment.SingleInstanceMutexName, out bool createdNew);
+            _ownsMutex = createdNew;
             if (!createdNew)
             {
                 System.Windows.MessageBox.Show(
@@ -46,6 +48,7 @@ namespace WorkAlarmClock
             try
             {
                 AppEnvironment.EnsureDirectories();
+                AppEnvironment.Log("数据目录：" + AppEnvironment.RootDirectory);
                 AppServices.Initialize();
 
 
@@ -70,6 +73,25 @@ namespace WorkAlarmClock
                 AppServices.Hotkey.Install(this);
 
                 AppEnvironment.Log("桌宠窗口已显示。");
+
+                // 测试钩子：WORKALARM_TEST_ROI="x,y,w,h" 时启动后自动触发一次区域截图，
+                // 用于自动化验证「裁剪 → 标注窗口」的比例是否正确。
+                if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WORKALARM_TEST_ROI")))
+                {
+                    AppEnvironment.Log("测试钩子：准备自动触发区域截图。");
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        try
+                        {
+                            AppServices.Screenshot.StartCapture();
+                        }
+                        catch (Exception ex)
+                        {
+                            AppEnvironment.Log("测试区域截图失败。", ex);
+                        }
+                    }));
+                }
+
             }
             catch (Exception ex)
             {
@@ -99,7 +121,7 @@ namespace WorkAlarmClock
             {
                 try
                 {
-                    _singleInstanceMutex?.ReleaseMutex();
+                    if (_ownsMutex) _singleInstanceMutex?.ReleaseMutex();
                     _singleInstanceMutex?.Dispose();
                     _singleInstanceMutex = null;
                 }
@@ -182,7 +204,7 @@ namespace WorkAlarmClock
             e.SetObserved();
         }
 
-        /// <summary>显示/隐藏桌宠窗口（热键与托盘菜单共用；静默切换，不抢焦点、不弹其它窗口）。</summary>
+        /// <summary>桌宠与灵动岛互相切换（热键与托盘菜单共用；静默切换，不抢焦点、不弹其它窗口）。</summary>
         private static void TogglePetWindow()
         {
             if (_petWindow is null)
@@ -190,18 +212,13 @@ namespace WorkAlarmClock
                 return;
             }
 
-            if (_petWindow.IsVisible)
+            if (!_petWindow.IsVisible)
             {
-                _petWindow.Hide();
-                AppEnvironment.Log("桌宠已隐藏。");
-            }
-            else
-            {
-                // ShowActivated=False + WS_EX_TOOLWINDOW：显示时不激活、不进 Alt+Tab，
-                // 因此不会打断当前正在操作的窗口。
                 _petWindow.Show();
-                AppEnvironment.Log("桌宠已显示。");
             }
+
+            _petWindow.ToggleCompactMode();
+            AppEnvironment.Log("桌宠形态已切换。");
         }
 
         /// <inheritdoc />
@@ -218,6 +235,28 @@ namespace WorkAlarmClock
 
         /// <inheritdoc />
         void IHotkeyActions.TogglePet() => AppServices.RaisePetToggle();
+
+        void IHotkeyActions.ToggleVisible() => HideShowPetWindow();
+
+        /// <summary>显示/隐藏当前形态（桌宠或灵动岛）。</summary>
+        private static void HideShowPetWindow()
+        {
+            if (_petWindow is null)
+            {
+                return;
+            }
+
+            if (_petWindow.IsVisible)
+            {
+                _petWindow.Hide();
+                AppEnvironment.Log("桌宠已隐藏。");
+            }
+            else
+            {
+                _petWindow.Show();
+                AppEnvironment.Log("桌宠已显示。");
+            }
+        }
 
         /// <inheritdoc />
         void IHotkeyActions.Screenshot() => AppServices.Screenshot.StartCapture();

@@ -1,117 +1,115 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Windows.Threading;
 using WorkAlarmClock.Infrastructure;
 using WorkAlarmClock.Models;
 
 namespace WorkAlarmClock.Services;
 
-/// <summary>
-/// 全局低层键盘钩子热键服务（增量 R-22）。
-/// 在 UI 线程注册 SetWindowsHookEx(WH_KEYBOARD_LL, …)，回调即在 UI 线程消息泵中执行，
-/// 直接访问业务命令线程安全，无需 Dispatcher.Invoke（会死锁）。命中 5 组自定义组合键时回调 IHotkeyActions。
-/// 始终 CallNextHookEx，不抢占其他程序热键。
-/// </summary>
+/// <summary>OS-registered global hotkeys with a dedicated message window.</summary>
 public sealed class HotkeyService : IHotkeyService, IDisposable
 {
     private readonly ISettingsService _settings;
+    private readonly Dictionary<int, HotkeyAction> _registered = new();
+    private HwndSource? _source;
     private IHotkeyActions? _actions;
-    private NativeMethods.LowLevelKeyboardProc? _proc;
-    private IntPtr _hook = IntPtr.Zero;
+    private int _generation;
+    private string? _bindings;
 
-    /// <summary>构造热键服务。</summary>
-    /// <param name="settings">设置服务（读取 5 组自定义组合键）。</param>
-    public HotkeyService(ISettingsService settings)
-    {
-        _settings = settings;
-    }
+    public HotkeyService(ISettingsService settings) => _settings = settings;
 
-    /// <inheritdoc />
     public void Install(IHotkeyActions actions)
     {
-        if (_hook != IntPtr.Zero)
-        {
-            return;
-        }
-
+        if (_source is not null) return;
         _actions = actions ?? throw new ArgumentNullException(nameof(actions));
-
-        // 必须在 UI 线程安装；回调强引用存为字段防止 GC 回收。
-        _proc = HookCallback;
-        _hook = NativeMethods.SetWindowsHookEx(
-            NativeMethods.WH_KEYBOARD_LL,
-            _proc,
-            NativeMethods.GetModuleHandle(null),
-            0);
-
-        if (_hook == IntPtr.Zero)
+        _source = new HwndSource(new HwndSourceParameters("WorkAlarmClock.GlobalHotkeys")
         {
-            int error = Marshal.GetLastWin32Error();
-            AppEnvironment.Log("安装全局键盘钩子失败，错误码：" + error);
-            _proc = null;
+            ParentWindow = new IntPtr(-3), Width = 0, Height = 0, WindowStyle = 0
+        });
+        _source.AddHook(WindowProc);
+        _settings.SettingsChanged += OnSettingsChanged;
+        RegisterAll();
+    }
+
+    private void OnSettingsChanged(object? sender, EventArgs e) => RegisterAll();
+
+    private void RegisterAll()
+    {
+        if (_source is null) return;
+        string bindings = string.Join(";", _settings.Current.Hotkeys.Enumerate()
+            .Select(item => $"{item.Item1}:{item.Item2.VirtualKeyCode}:{item.Item2.Ctrl}:{item.Item2.Alt}:{item.Item2.Shift}"));
+        if (_bindings == bindings) return;
+        _bindings = bindings;
+        _generation++;
+        foreach (int id in _registered.Keys) UnregisterHotKey(_source.Handle, id);
+        _registered.Clear();
+        var failures = new List<string>();
+        foreach (var (action, combo) in _settings.Current.Hotkeys.Enumerate())
+        {
+            int id = 100 + (int)action;
+            uint modifiers = 0x4000u | (combo.Alt ? 1u : 0u) | (combo.Ctrl ? 2u : 0u) | (combo.Shift ? 4u : 0u);
+            if (combo.VirtualKeyCode > 0 && RegisterHotKey(_source.Handle, id, modifiers, (uint)combo.VirtualKeyCode))
+            {
+                _registered.Add(id, action);
+                AppEnvironment.Log($"Global hotkey registered: {action} = {combo.ToDisplayString()}");
+            }
+            else
+            {
+                int error = Marshal.GetLastWin32Error();
+                failures.Add(combo.ToDisplayString());
+                AppEnvironment.LogWarning($"Global hotkey failed: {action} = {combo.ToDisplayString()}, Win32={error}");
+            }
         }
-        else
+        if (failures.Count > 0)
         {
-            AppEnvironment.Log("全局键盘钩子已安装。");
+            string keys = string.Join(", ", failures);
+            _source.Dispatcher.BeginInvoke(new Action(() =>
+                System.Windows.MessageBox.Show("以下全局热键注册失败：" + keys + "\n组合键可能已被其他程序占用，请在设置中更换。详情见日志。", "WorkAlarmClock",
+                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning)));
         }
     }
 
-    /// <inheritdoc />
+    private IntPtr WindowProc(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message == 0x0312 && _registered.TryGetValue(wParam.ToInt32(), out var action))
+        {
+            handled = true;
+            int generation = _generation;
+            _source!.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            {
+                if (_actions is null || generation != _generation) return;
+                try { Fire(action, _actions); }
+                catch (Exception ex) { AppEnvironment.Log("Global hotkey action failed: " + action, ex); }
+            }));
+        }
+        return IntPtr.Zero;
+    }
+
     public void Uninstall()
     {
-        if (_hook != IntPtr.Zero)
+        _settings.SettingsChanged -= OnSettingsChanged;
+        _generation++;
+        if (_source is not null)
         {
-            NativeMethods.UnhookWindowsHookEx(_hook);
-            _hook = IntPtr.Zero;
+            foreach (int id in _registered.Keys) UnregisterHotKey(_source.Handle, id);
+            _registered.Clear();
+            _source.RemoveHook(WindowProc);
+            _source.Dispose();
+            _source = null;
         }
-
-        _proc = null;
         _actions = null;
-        AppEnvironment.Log("全局键盘钩子已卸载。");
+        _bindings = null;
     }
 
-    /// <summary>低层键盘钩子回调（运行于 UI 线程）。</summary>
-    /// <param name="nCode">钩子码。</param>
-    /// <param name="wParam">消息类型。</param>
-    /// <param name="lParam">指向 KBDLLHOOKSTRUCT 的指针。</param>
-    /// <returns>调用链下一钩子的结果。</returns>
-    private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-    {
-        if (nCode == 0 && wParam == (IntPtr)NativeMethods.WM_KEYDOWN && _actions is not null)
-        {
-            try
-            {
-                int vkCode = Marshal.ReadInt32(lParam);
-                bool ctrl = IsDown(NativeMethods.VK_LCONTROL) || IsDown(NativeMethods.VK_RCONTROL);
-                bool alt = IsDown(NativeMethods.VK_LMENU) || IsDown(NativeMethods.VK_RMENU);
-                bool shift = IsDown(NativeMethods.VK_LSHIFT) || IsDown(NativeMethods.VK_RSHIFT);
-
-                Dispatch(vkCode, ctrl, alt, shift);
-            }
-            catch (Exception ex)
-            {
-                AppEnvironment.Log("热键回调处理异常。", ex);
-            }
-        }
-
-        // 始终转发给下一钩子，绝不吞键。
-        return NativeMethods.CallNextHookEx(_hook, nCode, wParam, lParam);
-    }
-
-    private static bool IsDown(int vKey) => (NativeMethods.GetAsyncKeyState(vKey) & 0x8000) != 0;
-
-    /// <summary>按当前修饰键状态匹配 5 组组合键并触发对应动作。</summary>
-    private void Dispatch(int vkCode, bool ctrl, bool alt, bool shift)
-    {
-        IHotkeyActions actions = _actions!;
-        foreach ((HotkeyAction action, HotkeyCombo combo) in _settings.Current.Hotkeys.Enumerate())
-        {
-            if (combo.VirtualKeyCode == vkCode && combo.Ctrl == ctrl && combo.Alt == alt && combo.Shift == shift)
-            {
-                Fire(action, actions);
-                return;
-            }
-        }
-    }
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnregisterHotKey(IntPtr window, int id);
 
     private static void Fire(HotkeyAction action, IHotkeyActions actions)
     {
@@ -138,12 +136,11 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
             case HotkeyAction.Focus:
                 actions.FocusToggle();
                 break;
+            case HotkeyAction.ToggleVisible:
+                actions.ToggleVisible();
+                break;
         }
     }
 
-    /// <inheritdoc />
-    public void Dispose()
-    {
-        Uninstall();
-    }
+    public void Dispose() => Uninstall();
 }

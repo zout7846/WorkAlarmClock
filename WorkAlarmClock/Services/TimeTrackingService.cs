@@ -101,11 +101,52 @@ public sealed class TimeTrackingService : ITimeTrackingService
         // 手动结束当天后又处于工作中 = 加班补记模式：检测类照常运作，Schedule 持续静默。
         _overtimeMode = _today.ManualEnded && _currentState == WorkState.Working;
         _lastAppliedPoint = LastPointAtOrBefore(now);
+        EnsureLunchOnLoad(now);
         AppEnvironment.Log(string.Concat(
             "当日记录已加载：日期=", _today.Date.ToString("yyyy-MM-dd"),
             "，流水=", _today.Transitions.Count.ToString(), " 条",
             "，当前状态=", ScheduleService.StateToText(_currentState, _currentRestSource)));
         StateChanged?.Invoke(this, _currentState);
+    }
+
+    /// <summary>
+    /// 启动时落在午休时段内的兜底：把「休息中但来源不是午休」或「仍在工作中」纠正为午休。
+    /// 因为 <c>_lastAppliedPoint</c> 会直接取到最近的午休开始点，错过的那次作息切换不会再触发。
+    /// </summary>
+    private void EnsureLunchOnLoad(DateTimeOffset now)
+    {
+        if (_today.ManualEnded || !_settings.Current.LunchEnabled)
+        {
+            return;
+        }
+
+        if (!ReplayCalculator.IsWithinLunch(now, _settings.Current))
+        {
+            return;
+        }
+
+        if (_currentState == WorkState.Resting && _currentRestSource != RestSource.Lunch)
+        {
+            // 补一条「午休开始」流水，时间取今天午休起点，避免这段被算成空闲休息。
+            (DateOnly date, _) = ScheduleService.Split(now);
+            _today.Transitions.Add(new StateTransition
+            {
+                Time = ScheduleService.ToLocal(date, _settings.Current.LunchStartTime),
+                From = WorkState.Resting,
+                To = WorkState.Resting,
+                Source = TriggerSource.Schedule,
+                Note = "午休开始"
+            });
+            Recompute(now);
+            Persist();
+            AppEnvironment.Log("启动对账：休息来源已纠正为午休。");
+            return;
+        }
+
+        if (_currentState == WorkState.Working)
+        {
+            Transition(WorkState.Resting, TriggerSource.Schedule, "午休开始");
+        }
     }
 
     /// <inheritdoc />
@@ -120,10 +161,23 @@ public sealed class TimeTrackingService : ITimeTrackingService
         WorkState target = TargetStateOf(kind);
         if (target == _currentState)
         {
-            // 已在目标状态：仅刷新休息来源（例如午休开始）。
+            // 已在目标状态：只在「午休开始」时补一条休息来源流水。
+            // 不能只改内存字段——时长与来源完全由流水重放派生，不落流水会被立刻重放回原来源（Bug：午休不生效）。
             if (target == WorkState.Resting && kind == SchedulePointKind.LunchStart && _currentRestSource != RestSource.Lunch)
             {
-                _currentRestSource = RestSource.Lunch;
+                DateTimeOffset now = _ticker.Now;
+                _today.Transitions.Add(new StateTransition
+                {
+                    Time = now,
+                    From = WorkState.Resting,
+                    To = WorkState.Resting,
+                    Source = TriggerSource.Schedule,
+                    Note = "午休开始"
+                });
+                Recompute(now);
+                Persist();
+                AppEnvironment.Log("已进入午休（休息来源切换为午休）。");
+                StateChanged?.Invoke(this, _currentState);
             }
 
             return;

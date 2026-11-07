@@ -105,6 +105,9 @@ public static class AppServices
     /// <summary>网络测速。</summary>
     public static ISpeedTestService SpeedTest => Provider.GetRequiredService<ISpeedTestService>();
 
+    /// <summary>系统状态（摄像头 / 麦克风 / 音频 / 截图）。</summary>
+    public static SystemStatusService SystemStatus => Provider.GetRequiredService<SystemStatusService>();
+
     /// <summary>桌宠气泡请求事件（桌宠窗口订阅）。</summary>
     public static event EventHandler<BubbleRequest>? BubbleRequested;
 
@@ -148,7 +151,7 @@ public static class AppServices
         }
 
         ServiceCollection services = new ServiceCollection();
-        ConfigureServices(services);
+        ConfigureServices(services, testClock);
         _provider = services.BuildServiceProvider();
 
         // 解析全部单例并缓存到静态字段，便于事件接线与生命周期管理。
@@ -207,12 +210,14 @@ public static class AppServices
 
     /// <summary>集中注册全部服务（单例，与 v1 组合根一致）。</summary>
     /// <param name="services">服务集合。</param>
-    private static void ConfigureServices(ServiceCollection services)
+    /// <param name="testClock">测试时钟注入（WORKALARM_TEST_NOW），正常启动为 null。</param>
+    private static void ConfigureServices(ServiceCollection services, Func<DateTimeOffset>? testClock = null)
     {
         // 同时注册具体类与接口，并让接口转发到同一单例实例：
         // - 具体类注册供 AppServices.Initialize 按具体类型解析（与 v1 字段类型一致）；
         // - 接口转发保证 IStorageService 等属性与具体类解析得到同一个实例，避免重复构造单例。
-        services.AddSingleton<ClockTicker>();
+        // 时钟源必须在这里注入，否则 WORKALARM_TEST_NOW 只打日志、不生效。
+        services.AddSingleton(sp => new ClockTicker(testClock));
         services.AddSingleton<ITicker>(sp => sp.GetRequiredService<ClockTicker>());
         services.AddSingleton<StorageService>();
         services.AddSingleton<IStorageService>(sp => sp.GetRequiredService<StorageService>());
@@ -256,6 +261,7 @@ public static class AppServices
         services.AddSingleton<IClipboardHistoryService>(sp => sp.GetRequiredService<ClipboardHistoryService>());
         services.AddSingleton<SpeedTestService>();
         services.AddSingleton<ISpeedTestService>(sp => sp.GetRequiredService<SpeedTestService>());
+        services.AddSingleton<SystemStatusService>();
     }
 
     /// <summary>接线托盘菜单命令（需要在 MainViewModel 创建之后调用）。</summary>

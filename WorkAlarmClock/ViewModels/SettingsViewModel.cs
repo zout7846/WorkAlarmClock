@@ -153,6 +153,13 @@ public sealed class SettingsViewModel : ObservableObject
         set { Draft.Hotkeys.TogglePet = value; OnPropertyChanged(); ValidateLive(); }
     }
 
+    /// <summary>显示 / 隐藏桌宠热键组合。</summary>
+    public HotkeyCombo HotkeyToggleVisible
+    {
+        get => Draft.Hotkeys.ToggleVisible;
+        set { Draft.Hotkeys.ToggleVisible = value; OnPropertyChanged(); ValidateLive(); }
+    }
+
     /// <summary>区域截图热键组合。</summary>
     public HotkeyCombo HotkeyScreenshot
     {
@@ -522,11 +529,7 @@ public sealed class SettingsViewModel : ObservableObject
         }
 
         // 热键组内唯一性校验：无空键、无重复组合。
-        HotkeyCombo[] combos =
-        {
-            Draft.Hotkeys.StartWork, Draft.Hotkeys.StartRest, Draft.Hotkeys.EndDay,
-            Draft.Hotkeys.GenerateReport, Draft.Hotkeys.TogglePet
-        };
+        HotkeyCombo[] combos = Draft.Hotkeys.Enumerate().Select(item => item.Combo).ToArray();
         for (int i = 0; i < combos.Length; i++)
         {
             if (combos[i].VirtualKeyCode == 0)

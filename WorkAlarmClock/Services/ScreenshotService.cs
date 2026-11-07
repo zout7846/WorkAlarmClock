@@ -64,6 +64,24 @@ public sealed class ScreenshotService : IScreenshotService
 
             SD.Rectangle bounds = WF.SystemInformation.VirtualScreen;
             _frozenBitmap = CaptureScreen(bounds);
+
+            // 测试钩子：WORKALARM_TEST_ROI="x,y,w,h"（物理像素）时跳过交互遮罩，
+            // 直接按该矩形走一遍“裁剪 → 标注窗口”，用于自动化验证比例不失真。
+            string? testRoi = Environment.GetEnvironmentVariable("WORKALARM_TEST_ROI");
+            if (!string.IsNullOrWhiteSpace(testRoi))
+            {
+                string[] parts = testRoi.Split(',');
+                if (parts.Length == 4
+                    && int.TryParse(parts[0], out int rx)
+                    && int.TryParse(parts[1], out int ry)
+                    && int.TryParse(parts[2], out int rw)
+                    && int.TryParse(parts[3], out int rh))
+                {
+                    OnCaptureCompleted(this, new Int32Rect(rx, ry, rw, rh));
+                    return;
+                }
+            }
+
             BitmapSource frozen = ToBitmapSource(_frozenBitmap);
             IReadOnlyList<WindowTarget> windows = EnumerateWindows(bounds);
 
@@ -109,6 +127,12 @@ public sealed class ScreenshotService : IScreenshotService
     /// <inheritdoc />
     public string ResolveScreenshotDirectory()
     {
+        string? testDirectory = Environment.GetEnvironmentVariable("WORKALARM_TEST_SCREENSHOT_DIR");
+        if (!string.IsNullOrWhiteSpace(testDirectory))
+        {
+            return testDirectory;
+        }
+
         string configured = _settings.Current.ScreenshotDirectory;
         return string.IsNullOrWhiteSpace(configured)
             ? AppEnvironment.DefaultScreenshotDirectory

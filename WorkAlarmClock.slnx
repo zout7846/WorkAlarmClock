@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="WorkAlarmClock/WorkAlarmClock.csproj" />
+  <Project Path="WorkAlarmClock.Admin/WorkAlarmClock.Admin.csproj" />
 </Solution>

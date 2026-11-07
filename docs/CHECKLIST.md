@@ -396,3 +396,158 @@
 - 选中节点后单独再测一次延迟（并发探测时网络竞争会把 TTFB 抬到 ~200ms，单测回落到 ~50ms）。
 - 上传压到 1MB + 10 秒超时，超时保留过程中测得的速率，不整轮失败。
 - **实测**：节点华为云，延迟 48~53ms，下载 105~122Mbps，上传 3.6~5.1Mbps，全程约 3 秒。
+
+## 增量验收（v2.6：桌宠收起态 = 灵动岛）
+
+### R-67 收起态改为灵动岛 ✅
+- 圆形斑点换成黑色胶囊：状态圆点 + 时间（HH:mm）+ 分隔线 + 「已工作 Xh Ym」，圆角 16、深色底 `#F20B0B0E`、内描边 `#26FFFFFF`。
+- 窗口按胶囊尺寸固定（176×32 + 四周 6px 留白），胶囊按所在半屏左/右对齐；点胶囊展开为完整桌宠，右键菜单「收起为灵动岛 / 展开桌宠」。
+- **踩坑与修复**：
+  1. 悬停时修改 `Window.Width` 在屏幕边缘会被系统钳回 → Enter/Leave 死循环 → 栈溢出（进程静默消失、无日志）。改为窗口尺寸恒定，不做 resize。
+  2. 胶囊上的 `DropShadowEffect` 在 `AllowsTransparency + Topmost` 窗口里会杀死进程（同样无日志）。移除阴影。
+  3. 因此放弃悬停展开动画，改为常显「已工作时长」，稳定性优先。
+- **验证**：单次会话内连续 5 轮悬停进出 + 10 秒静置仍存活；`PrintWindow` 抓图确认胶囊内容完整、圆角无裁切、文字不溢出。
+
+### R-68 重新打包 ✅
+- `dotnet publish -c Release -r win-x64 --self-contained false -o dist`（框架依赖，与用户现有 `dist` 结构一致）。
+- 用用户自己的脚本 `pubilc\1.iss` 编译 → `pubilc\打卡桌宠.exe`（3.9 MB，AppName=CheckInTablePets 1.5）。
+
+## 增量验收（v2.7：对话并入时间框 / 热键切换 / 灵动岛顶部居中 / 贴边修复）
+
+### R-69 对话并入时间卡 ✅
+- 删除独立悬浮气泡与其小尾巴；`BubbleText` / `BubbleActions` / `BubbleActionLabel` 全部移入时钟卡内部（分隔细线 + 11.5px 正文 + 动作按钮）。
+- 卡片宽度 138→152，`BubbleVisible` 时淡入展开，收起时不影响卡片高度。
+- **验证**：真实屏幕截图确认「10:57 / 已工作 01:22 / 老朋友们，记得喝水～」同一张白卡内，无独立气泡。
+
+### R-70 桌宠 ↔ 灵动岛 自定义热键 ✅
+- 复用既有 `HotkeySettings.TogglePet`（设置「提醒」页可改组合键，用户当前为单键反引号）；`App.TogglePetWindow` 由「显示/隐藏」改为调用 `PetWindow.ToggleCompactMode()`。
+- 设置项文案改为「桌宠 / 灵动岛切换」。
+- **验证**：注入 VK 0xC0 → 窗口 (800,600,344×674) 变为 (1142,8,596×88)，再次按键回到原位置；进程存活。
+
+### R-71 灵动岛固定屏幕顶部居中 ✅
+- 收起时窗口尺寸固定（`IslandExpandedWidth + pad` × `IslandHeight + pad`），位置 `Left = 工作区中心 - 宽/2`、`Top = 工作区顶 + 4`。
+- 展开时回到收起前位置（`_restoreLeft/_restoreTop`），并夹紧在工作区内。
+- **验证**：596px 宽窗口左边界 1142 → 1142+298=1440 = 屏幕宽 2880 的一半（2x DPI），确认水平居中、贴顶 8px。
+
+### R-72 贴边/越界收起修复 ✅
+- 距离由 `Math.Abs(窗口边 - 工作区边)` 改为 `Math.Max(0, …)`：越过边界即为 0，不再因拖出屏幕导致距离变大而漏判。
+- **验证**：拖出顶部、拖出左侧、拖到右下角三种情况均成功收起为灵动岛（344×674 → 596×88）。
+
+### R-73 灵动岛互动性与监控 ✅
+- 紧凑态：状态点（带 1.1s 呼吸脉冲）+ 时间。
+- 悬停：胶囊 176→288 平滑展开，追加「已工作 01:22」「今日 N 条」，专注计时中再追加番茄钟剩余。
+- 交互：单击展开桌宠、右键菜单切换、拖动仍可用（窗口尺寸恒定，避免边缘 resize 死循环）。
+- **验证**：悬停展开/移开收回截图正常，进程存活。
+
+### R-74 打包 ✅
+- `dotnet publish -c Release -r win-x64 --self-contained false -o dist` → `pubilc\1.iss` 编译 → `pubilc\打卡桌宠.exe`（3.9 MB）。
+
+## 增量验收（v2.8：灵动岛圆角/脉冲/通知/系统状态/显隐热键）
+
+### R-75 脉冲状态点完整显示 ✅
+- 胶囊左内边距 13→14，状态点容器固定 8×8，脉冲最大 2.1 倍且底形不裁切内容；实测光晕完整外扩无截断。
+
+### R-76 连续曲率圆角（超椭圆）✅
+- 弃用 `Border.CornerRadius`，改为 `Path` + 代码生成的超椭圆路径（`|x/a|^n+|y/b|^n=1`，n=2.7，64 段），尺寸变化时重建并冻结几何。
+- 胶囊由「圆弧端」变为连续曲率端，边缘过渡更柔；宽度动画期间同步重建。
+
+### R-77 灵动岛通知弹出 ✅
+- 收起态收到气泡时，胶囊临时加宽（按文本长度 240~470px）显示消息，5.5 秒后自动收回；悬停态收回宽度自适应。
+- 实测：`● 11:24 🎵 老朋友们，记得喝水～`，5.5s 后回到 `● 11:24`。
+
+### R-78 系统状态监控（摄像头 / 麦克风 / 音频 / 截图）✅
+- 新增 `SystemStatusService`：1.5s 轮询。
+  - 摄像头/麦克风：读 `ConsentStore\webcam|microphone` 的 `LastUsedTimeStart/Stop`（Start>0 且 Stop=0 视为占用）。
+  - 音频播放：COM `MMDeviceEnumerator` + `IAudioMeterInformation.GetPeakValue() > 0.0025`。
+  - 截图：`ScreenshotService.IsCapturing`。
+- 灵动岛在时间右侧显示图标：摄像头红、麦克风橙、音频绿、截图蓝。
+- **验证**：播放系统 wav → 绿色音符出现；停止 → 消失。
+
+### R-79 显示 / 隐藏桌宠（或灵动岛）✅
+- 新增 `HotkeyAction.ToggleVisible`（默认 Ctrl+Alt+H）+ 设置页热键行 + 右键菜单「隐藏桌宠」。
+- 与 `TogglePet`（形态切换）分离，互不干扰。
+- **验证**：Ctrl+Alt+H → 窗口隐藏；再按 → 恢复（灵动岛形态 596×88）。
+
+### R-80 打包 ✅
+- publish → `dist`；`pubilc\1.iss` → `pubilc\打卡桌宠.exe`。
+
+## 增量验收（v2.9：灵动岛状态文字 / 活动程序 / 3 秒延迟 / 苹果胶囊形状）
+
+### R-81 状态点改为状态文字 + 圆形脉冲光晕 ✅
+- 删除 8×8 状态点与 2.1 倍缩放脉冲；第 0 列改为水平排列的「圆形光晕 + 状态文字」：`Ellipse IslandGlow` 24×24（`StateGlowBrush` 径向渐变：状态色 0xE8 → 0x7A@35% → 0x28@65% → 透明，冻结画刷），5px 间距后接 `StateText`（12.5 SemiBold，`StateDotBrush` 着色，如「待上班 / 工作中 / 休息中」）。
+- 脉冲保留：`IslandGlowScale` 0.86↔1.16 + 光晕 Opacity 0.5↔0.95，1100ms AutoReverse Forever SineEase。
+- 光晕直径 24 DIP < 胶囊高 38、缩放峰值 27.8 DIP，不会被胶囊裁切；内容仍按胶囊轮廓裁切（`Geometry.Clone()` + `TranslateTransform(-16,0)` 后 Freeze）。
+- **验证**：4 帧（间隔 380ms）光晕区域平均亮度 69.1→69.0→72.0→75.5，确认在脉冲；左端放大截图为完美半圆 + 圆形光晕，无截断。
+
+### R-82 灵动岛 = 两端全圆的苹果胶囊 ✅
+- 默认形状改为 `BuildCapsule(width,height)`：两端半圆 + 上下直边，对齐参考图（苹果灵动岛观感）；胶囊高度 34→38。
+- 早期曾用超椭圆 3.6（长方 + 大圆角），按用户参考图最终改为胶囊；`BuildSquircle` 保留，仅 `WORKALARM_TEST_SHAPE` 数字时用于对比。
+- 底形填充不透明度 `#F20B0B0E`→`#F70B0B0E`：参考图是纯黑胶囊，旧 95% 在亮色窗口背景上会透出灰调。
+- **验证**：左/右端放大均为半圆（d2-left-zoom / d2-right-zoom）；胶囊实测紧凑 350×75 物理（175×38 DIP）、活动 534×75、悬停 842×75；亮色背景截图（m1/n1）底色接近纯黑。
+
+### R-83 活动状态 + 触发程序 ✅
+- 时间右侧新增活动文案：`程序 · 类型`（如「微信 · 摄像头」「QQ · 麦克风」）；同一程序的多种活动合并为「摄像头/麦克风」，其它程序追加「 +N」。
+- 颜色：摄像头 `#FF8B8B`、麦克风 `#FFB454`、音频 `#6BD5A0`、截图 `#6BB8FF`。
+- `SystemStatusService` 新增 `Activities`（`SystemActivityKind` + 程序名）：摄像头/麦克风按 `ConsentStore` 子键还原 exe → 别名表（微信/QQ/钉钉/飞书/Teams/Zoom/OBS/相机/录音机…）；音频用 `IAudioSessionManager2` 枚举 Active 非系统声音会话 → 进程名。
+- **验证**：伪造与真实探测两条路径均正常（无活动时只显示状态 + 时间）。
+
+### R-84 活动结束延迟 3 秒消失，且可被新状态打断 ✅
+- `PetViewModel`：活动出现 → 立即刷新并 `Stop()` 旧倒计时（打断）；活动消失 → 启动 3s `DispatcherTimer`，到时清空文案与可见性。
+- **验证**：活动结束后 1.3s 仍显示（h1-after-1_3s.png）、3.9s 已消失且胶囊回缩（h2-after-3_9s.png）；活动切换（摄像头微信 → 麦克风 QQ）在 3s 内直接替换为新文案。
+
+### R-85 灵动岛宽度自适应（不裁切）✅
+- 窗口尺寸恒定 `(520+24)×(38+24) DIP`（`IslandMaxWidth=520`、`IslandWindowPad=12`），胶囊宽度按 `FormattedText` 实测文本计算：紧凑 176~400、悬停追加「已工作 / 今日 N 条」后最多 520、通知最多 520。
+- 通知态临时隐藏状态列与活动列，通知文本 `MaxWidth=190`；修复旧版通知宽 470 > 窗口 298 被裁的问题。
+- **验证**：紧凑（e1.png）、活动（e1/d2）、悬停（e3.png）、通知（e4.png）四种状态截图均完整；悬停「已工作 00:00 | 今日 0 条」与「+1」均不裁切。
+
+### R-86 修复点击桌宠文字时的「Run 不是 Visual 或 Visual3D」崩溃 ✅
+- 现象：在桌宠/灵动岛上点击到文本（`TextBlock` 内的 `Run`，如状态文字、时间、已工作）时弹出未处理异常对话框：`"System.Windows.Documents.Run"不是 Visual 或 Visual3D`。
+- 根因：`PetWindow.IsWithinButton` 从 `e.OriginalSource` 一路 `VisualTreeHelper.GetParent`，而文本命中时事件源是 `ContentElement`（`Run`），不是 `Visual`。状态点改文字后命中文本的概率大幅上升，才暴露出来。
+- 修复：新增 `GetParentSafe`，按 `Visual` / `ContentElement`（`ContentOperations.GetParent` → `FrameworkContentElement.Parent`）/ `LogicalTreeHelper.GetParent` 分支取父级，并加 256 层上限防环。
+- **验证**：测试实例移动到屏幕左下后，沿胶囊从左到右连点 13 次（覆盖「待上班」「13:59」文本），进程存活、无 #32770 异常对话框（.tmp\click2-after.png）。
+
+## 增量验收（v2.9.1：午休自动切换 / 托盘图标 / 测试时钟）
+
+### R-87 修复「午休已启用但不自动执行」✅
+- 现象：把午休设为 12:00–13:00 并启用后，12:00 不会切到「午休中」，午休时长始终为 0，导出表里的午休分钟也是 0。
+- 根因：12:00 之前用户已经因键鼠空闲进入「休息中（空闲）」，12:00 到点时 `ApplySchedulePoint(LunchStart)` 命中 `target == _currentState` 分支，只把内存里的 `_currentRestSource` 改成午休，**没有落流水**；下一次 `Recompute` 用流水重放（`ReplayCalculator`）立刻把来源算回「空闲」，界面与统计都不认这次午休。
+- 修复：`target == current` 且为午休开始时，改为追加一条 `Resting→Resting`、`Source=Schedule`、备注「午休开始」的流水 → `Recompute` + `Persist` + `StateChanged`。时长与来源始终由流水派生，落流水才不会被重放覆盖。
+- 补充：`LoadOrCreateToday` 末尾调用新方法 `EnsureLunchOnLoad(now)` —— 应用在午休时段内启动时，`_lastAppliedPoint` 会被直接设成 12:00，错过的那次切换不会再触发；这里补一条时间戳为**今天午休起点**的午休流水（休息中但来源非午休），或把仍在工作中的状态切到午休。
+- **验证**：注入 11:59:30 的测试时钟跑 42s → 12:00:00 出现 `1→2 source=0` 流水，胶囊显示「午休中 12:00」+ 金色光晕（.tmp\lunch3.png、.workbuddy\screenshots\v2.9.1-lunch.png）；构造「11:59:29 空闲休息 + 12:00:10 启动」的库重跑 → 加载时补出 `12:00:00 2→2 source=0` 流水，界面同样显示「午休中」（.tmp\scn-lunch-restart.png）。
+
+### R-88 修复 WORKALARM_TEST_NOW 测试时钟注入不生效 ✅
+- 现象：设了 `WORKALARM_TEST_NOW` 只打出「检测到 WORKALARM_TEST_NOW 时间注入」日志，实际状态/时间仍按真实时钟走，导致午休、跨天逻辑无法用固定时刻回归。
+- 根因：`AppServices.Initialize` 虽然解析出 `testClock`，但 `ConfigureServices` 没有接收，`ClockTicker` 仍是无参单例。
+- 修复：`ConfigureServices(ServiceCollection services, Func<DateTimeOffset>? testClock = null)` 首行改 `services.AddSingleton(sp => new ClockTicker(testClock));`，`Initialize` 传入 `testClock`。
+- **验证**：注入 12:00:10 后日志 `now=2026-11-06T12:00:10+08:00`，界面时间与状态同步为 12:00/午休中。
+
+### R-89 托盘图标健壮性加固 ✅
+- 现象：用户反馈任务栏与「隐藏的图标」里都看不到打卡桌宠的托盘图标（此前正常，某次之后消失）。
+- 排查：`NotificationService.InitializeTray` 先 `new NotifyIcon { Visible = true }` 再加载 `Icon`；`UpdateIcon` 在图标为 null 时直接 `return` —— 资源加载失败时会出现「Visible=true 但 Icon=null」的僵尸图标（Windows 不绘制）。Win11 XAML 托盘无法用 UI Automation 枚举，无法从进程外确认图标是否真的注册。
+- 修复：①先加载图标（失败回退 `SystemIcons.Application.Clone()`）再创建 `NotifyIcon`（`Icon` 已装配、`Visible = false`）；②菜单/事件装配完、`UpdateIcon` 之后再 `Visible = true`；③启动日志打印 `托盘图标已初始化（Icon=ok/null）`。
+- **验证**：测试实例日志固定输出 `托盘图标已初始化（Icon=ok）`，资源加载正常；如用户端仍不可见，说明是 Windows 侧的隐藏/折叠状态，需要用户在「设置 → 个性化 → 任务栏 → 其他系统托盘图标」里把打卡桌宠打开，或重启应用重新注册。
+
+### R-90 解决方案新增 WorkAlarmClock.Admin 本地数据库管理程序 ✅
+- 位置：`WorkAlarmClock.Admin\`（控制台，net10.0），已加入 `WorkAlarmClock.slnx`。
+- 功能：概览（路径/大小/各表行数/日期范围）、查看某天流水、最近 N 天工时汇总、查看/修改 settings、备份/删除某天/导出 CSV；破坏性操作二次确认 + 自动备份；支持 `WORKALARM_DB` 或命令行参数指到数据库副本。
+- **验证**：`dotnet build .\WorkAlarmClock.Admin\WorkAlarmClock.Admin.csproj -c Debug` 0 警告 0 错误；对 `.tmp\admin-smoke\workalarm.db` 副本跑通「概览 → 某天流水 → 改设置 → 备份 → 导出 CSV」。
+
+## 增量验收（v2.9.2：截图比例 / 托盘图标可见性）
+
+### R-91 修复「区域截图 / 自定义 ROI」比例失真 ✅
+- 现象：截图标注窗里预览被拉扁/拉长，箭头与文字也跟着变形；自定义 ROI 越极端（宽扁或窄高）越明显。
+- 根因：`Views\ScreenshotAnnotationWindow.xaml` 的 `<Image Stretch="Fill">` 放在一个宽高比与截图无关的 Grid 里，必然非等比拉伸；`Compose()` 又分别用 `PixelWidth/hostWidth`、`PixelHeight/hostHeight` 两个缩放值绘制标注，标注坐标被二次拉歪。
+- 修复：①预览改为 `CanvasHost`（可用区域）内套 `ImageHost`，`FitImageHost()` 在 `Loaded`/`SizeChanged` 时用 `Math.Min(可用宽/图宽, 可用高/图高)` 算出统一比例，把 `ImageHost` 的 `Width/Height` 设成图片比例 → `Stretch="Fill"` 也不会变形；②`Compose()` 改为单一 `scale`（`_image.PixelWidth / hostWidth`）`PushTransform(new ScaleTransform(scale, scale))`，避免标注被拉扁。
+- **验证**：`WORKALARM_TEST_ROI=200,200,800,400` 运行时日志 `预览适配：图片 800x400，画布 883.0x577.9，显示 883.0x442.0`（883/442 = 1.998）；`WORKALARM_TEST_ROI_AUTOSAVE=1` 自动保存得到 800×400 PNG，与 ROI 完全一致；ROI 1120×140 保存为 1120×140 PNG。
+
+### R-92 托盘图标可见性加固（彩色图标 + 落点日志 + 重试注册）✅
+- 现象：用户在任务栏角落与「隐藏的图标」面板都找不到打卡桌宠图标。
+- 排查结论：①图标资源本身正常（`Assets\tray.ico` 为橙色多尺寸时钟）；②`HKCU\Control Panel\NotifyIconSettings` 中已有 5 条本程序记录，含 `IconSnapshot`（16×16 灰蓝时钟，可见像素 214/256）→ 历史上 NIM_ADD 成功过，图标被 shell 记下来了；③但这些记录都没有 `IsPromoted`（未提升到角落显示），且 shell 的这些键受保护，程序无法写 `IsPromoted`、也无法写 `EnableAutoTray`；④本会话运行在受限沙箱里，`SendInput` 鼠标定位/点击被拒、`Shell_NotifyIcon` 直接返回 false，因此**无法从外部截到托盘面板**。
+- 修复：①托盘图标不再随状态切灰度（灰度图在浅色任务栏/隐藏面板里几乎看不见），统一用彩色时钟；②仍保持「先装 Icon 再 Visible」，并在菜单装配后再 `Visible = true`；③启动后 2 秒 × 4 次重发 NIM_ADD（`Visible=false → true`），补救登录时 explorer 还没准备好的情况；④新增 `Shell_NotifyIconGetRect` 落点日志：hr=0 打印可见坐标，否则打印 hr（0x80004005 表示 shell 未接受/未显示），便于用户端复盘。
+- **验证**：测试实例日志新增 `托盘图标位置：…` 行；`托盘图标已添加（Icon=ok）`；重试注册 1~4 次按序出现。
+- 说明：Windows 11 默认把新图标放进「隐藏的图标」面板，需要用户在「设置 → 个性化 → 任务栏 → 其他系统托盘图标」里打开打卡桌宠，或把图标从 `^` 面板拖到任务栏角落；这一步无法由程序代替。
+
+### R-93 新增《操作手册》✅
+- 位置：`docs\操作手册.md`（705 行、19.7 千字、26 张表格、FAQ 15 条、12 章）。
+- 覆盖：产品简介、安装升级、界面总览、日常操作、托盘菜单（10 项）、全局热键（8 项）、灵动岛能力、设置项默认值、数据与隐私、Admin 工具、FAQ、版本记录。
+- 同时记录旧文档与源码的 8 处不一致（v1 JSON 描述残留、托盘 7→10 项、热键 5→8 个、托盘「显示/隐藏桌宠」文案与实际行为不符、安装脚本版本 1.5 等）。

@@ -42,9 +42,20 @@ public partial class ScreenshotAnnotationWindow : Window
         _directory = directory;
         _copyAfterSave = copyAfterSave;
 
+        ImageHost.Width = image.PixelWidth;
+        ImageHost.Height = image.PixelHeight;
         CanvasImage.Source = image;
         StatusText.Text = "尺寸 " + image.PixelWidth + " × " + image.PixelHeight +
                           "　·　保存到：" + directory;
+
+        if (Environment.GetEnvironmentVariable("WORKALARM_TEST_ROI_AUTOSAVE") == "1")
+        {
+            Loaded += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                AppEnvironment.Log("测试钩子：自动保存标注截图。");
+                OnSave(this, new RoutedEventArgs());
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
     }
 
     /// <summary>保存成功事件（参数为文件路径）。</summary>
@@ -266,24 +277,18 @@ public partial class ScreenshotAnnotationWindow : Window
     /// <summary>把「图片 + 标注」按原始像素合成一张位图。</summary>
     private BitmapSource Compose()
     {
-        double hostWidth = Math.Max(1, ImageHost.ActualWidth);
-        double hostHeight = Math.Max(1, ImageHost.ActualHeight);
-
         DrawingVisual visual = new DrawingVisual();
         using (DrawingContext context = visual.RenderOpen())
         {
-            context.PushTransform(new ScaleTransform(
-                _image.PixelWidth / hostWidth,
-                _image.PixelHeight / hostHeight));
-
-            VisualBrush brush = new VisualBrush(ImageHost)
+            Rect bounds = new Rect(0, 0, _image.PixelWidth, _image.PixelHeight);
+            context.DrawImage(_image, bounds);
+            VisualBrush annotations = new VisualBrush(ShapeLayer)
             {
-                Stretch = Stretch.None,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Top
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewbox = bounds,
+                Stretch = Stretch.Fill
             };
-            context.DrawRectangle(brush, null, new Rect(0, 0, hostWidth, hostHeight));
-            context.Pop();
+            context.DrawRectangle(annotations, null, bounds);
         }
 
         RenderTargetBitmap bitmap = new RenderTargetBitmap(

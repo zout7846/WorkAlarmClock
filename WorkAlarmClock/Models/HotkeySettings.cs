@@ -29,7 +29,10 @@ public enum HotkeyAction
     Screenshot,
 
     /// <summary>开始/停止专注。</summary>
-    Focus
+    Focus,
+
+    /// <summary>显示/隐藏桌宠（灵动岛）。</summary>
+    ToggleVisible
 }
 
 /// <summary>
@@ -149,6 +152,9 @@ public sealed class HotkeySettings
     /// <summary>开始/停止专注（默认 Ctrl+Alt+F）。</summary>
     public HotkeyCombo Focus { get; set; } = new HotkeyCombo(0x46, true, true, false);
 
+    /// <summary>显示/隐藏桌宠（默认 Ctrl+Alt+H）。</summary>
+    public HotkeyCombo ToggleVisible { get; set; } = new HotkeyCombo(0x48, true, true, false);
+
     /// <summary>按动作枚举取出对应组合。</summary>
     /// <param name="action">动作。</param>
     /// <returns>组合键。</returns>
@@ -160,6 +166,7 @@ public sealed class HotkeySettings
         HotkeyAction.GenerateReport => GenerateReport,
         HotkeyAction.Screenshot => Screenshot,
         HotkeyAction.Focus => Focus,
+        HotkeyAction.ToggleVisible => ToggleVisible,
         _ => TogglePet
     };
 
@@ -188,6 +195,9 @@ public sealed class HotkeySettings
             case HotkeyAction.Focus:
                 Focus = combo;
                 break;
+            case HotkeyAction.ToggleVisible:
+                ToggleVisible = combo;
+                break;
             default:
                 TogglePet = combo;
                 break;
@@ -205,5 +215,6 @@ public sealed class HotkeySettings
         yield return (HotkeyAction.TogglePet, TogglePet);
         yield return (HotkeyAction.Screenshot, Screenshot);
         yield return (HotkeyAction.Focus, Focus);
+        yield return (HotkeyAction.ToggleVisible, ToggleVisible);
     }
 }

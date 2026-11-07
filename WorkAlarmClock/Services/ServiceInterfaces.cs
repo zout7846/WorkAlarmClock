@@ -767,17 +767,20 @@ public interface IHotkeyActions
 
     /// <summary>开始/停止专注。</summary>
     void FocusToggle();
+
+    /// <summary>显示/隐藏桌宠（灵动岛）。</summary>
+    void ToggleVisible();
 }
 
 /// <summary>
-/// 全局键盘钩子热键服务：注册/卸载低层键盘钩子，命中 5 组自定义组合键时回调 <see cref="IHotkeyActions"/>。
+/// 全局热键服务：使用系统热键注册，命中组合键时回调 <see cref="IHotkeyActions"/>。
 /// </summary>
 public interface IHotkeyService
 {
-    /// <summary>在 UI 线程安装低层键盘钩子并绑定动作目标。</summary>
+    /// <summary>在 UI 线程注册全局热键并绑定动作目标。</summary>
     /// <param name="actions">动作目标（回调到业务命令）。</param>
     void Install(IHotkeyActions actions);
 
-    /// <summary>卸载键盘钩子（退出时调用）。</summary>
+    /// <summary>注销全局热键（退出时调用）。</summary>
     void Uninstall();
 }

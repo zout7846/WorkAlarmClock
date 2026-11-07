@@ -36,8 +36,6 @@ public sealed class NotificationService : INotificationService
     private WF.NotifyIcon? _notifyIcon;
     private TrayMenuCallbacks? _callbacks;
     private SD.Icon? _trayNormal;
-    private SD.Icon? _trayGray;
-    private bool? _trayIsGray;
     private WorkState _lastState = WorkState.BeforeWork;
     private string _lastTooltip = string.Empty;
     private DateTimeOffset _lastTooltipUpdate = DateTimeOffset.MinValue;
@@ -56,26 +54,16 @@ public sealed class NotificationService : INotificationService
     public void InitializeTray(TrayMenuCallbacks callbacks)
     {
         _callbacks = callbacks;
-        try
+        _trayNormal = LoadTrayIcon("/Assets/tray.ico") ?? (SD.Icon)SD.SystemIcons.Application.Clone();
+        _notifyIcon = new WF.NotifyIcon
         {
-            _notifyIcon = new WF.NotifyIcon
-            {
-                Visible = true,
-                Text = "WorkAlarmClock"
-            };
-            _notifyIcon.ContextMenuStrip = BuildMenu(callbacks);
-            _notifyIcon.MouseDoubleClick += (_, _) => ShowMainPanel();
-            _notifyIcon.BalloonTipClicked += (_, _) => ShowMainPanel();
-
-            _trayNormal = LoadTrayIcon("/Assets/tray.ico");
-            _trayGray = LoadTrayIcon("/Assets/tray-gray.ico");
-            UpdateIcon(WorkState.BeforeWork);
-            AppEnvironment.Log("托盘图标已初始化。");
-        }
-        catch (Exception ex)
-        {
-            AppEnvironment.Log("托盘图标初始化失败。", ex);
-        }
+            Icon = _trayNormal,
+            Text = "WorkAlarmClock",
+            ContextMenuStrip = BuildMenu(callbacks)
+        };
+        _notifyIcon.MouseDoubleClick += (_, _) => ShowMainPanel();
+        _notifyIcon.BalloonTipClicked += (_, _) => ShowMainPanel();
+        _notifyIcon.Visible = true;
     }
 
     /// <inheritdoc />
@@ -177,7 +165,6 @@ public sealed class NotificationService : INotificationService
             if (stateChanged)
             {
                 _lastState = state;
-                UpdateIcon(state);
             }
 
             if (_notifyIcon is null)
@@ -210,28 +197,15 @@ public sealed class NotificationService : INotificationService
     /// <summary>释放托盘资源与图标对象（必须调用，避免幽灵图标）。</summary>
     public void Dispose()
     {
-        try
+        if (_notifyIcon is not null)
         {
-            if (_notifyIcon is not null)
-            {
-                _notifyIcon.Visible = false;
-                _notifyIcon.ContextMenuStrip?.Dispose();
-                _notifyIcon.ContextMenuStrip = null;
-                _notifyIcon.Dispose();
-                _notifyIcon = null;
-            }
-
-            _trayNormal?.Dispose();
-            _trayNormal = null;
-            _trayGray?.Dispose();
-            _trayGray = null;
-            _trayIsGray = null;
-            AppEnvironment.Log("托盘资源已释放。");
+            _notifyIcon.Visible = false;
+            _notifyIcon.ContextMenuStrip?.Dispose();
+            _notifyIcon.Dispose();
+            _notifyIcon = null;
         }
-        catch (Exception ex)
-        {
-            AppEnvironment.Log("释放托盘资源失败。", ex);
-        }
+        _trayNormal?.Dispose();
+        _trayNormal = null;
     }
 
     /// <summary>构建托盘右键菜单（七项）。</summary>
@@ -273,40 +247,6 @@ public sealed class NotificationService : INotificationService
         return item;
     }
 
-    /// <summary>
-    /// 按状态切换托盘图标：工作中用彩色图标，其余状态（休息 / 午休 / 已下班 / 未开始）用灰度图标。
-    /// 图标为嵌入资源的多尺寸 ico，避免运行时 GDI 绘制的模糊问题。
-    /// </summary>
-    private void UpdateIcon(WorkState state)
-    {
-        if (_notifyIcon is null)
-        {
-            return;
-        }
-
-        bool gray = state != WorkState.Working;
-        if (_trayIsGray == gray)
-        {
-            return;
-        }
-
-        SD.Icon? icon = gray ? _trayGray : _trayNormal;
-        if (icon is null)
-        {
-            return;
-        }
-
-        try
-        {
-            _notifyIcon.Icon = icon;
-            _trayIsGray = gray;
-        }
-        catch (Exception ex)
-        {
-            AppEnvironment.Log("切换托盘图标失败。", ex);
-        }
-    }
-
     /// <summary>从嵌入资源加载托盘图标（按系统小图标尺寸挑选最合适的一帧）。</summary>
     private static SD.Icon? LoadTrayIcon(string relativeUri)
     {
@@ -321,7 +261,8 @@ public sealed class NotificationService : INotificationService
             }
 
             using System.IO.Stream stream = info.Stream;
-            return new SD.Icon(stream, WF.SystemInformation.SmallIconSize);
+            using SD.Icon loaded = new SD.Icon(stream, WF.SystemInformation.SmallIconSize);
+            return (SD.Icon)loaded.Clone();
         }
         catch (Exception ex)
         {

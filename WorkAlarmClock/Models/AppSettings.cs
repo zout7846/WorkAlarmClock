@@ -284,7 +284,8 @@ public sealed class AppSettings
                 GenerateReport = Hotkeys.GenerateReport,
                 TogglePet = Hotkeys.TogglePet,
                 Screenshot = Hotkeys.Screenshot,
-                Focus = Hotkeys.Focus
+                Focus = Hotkeys.Focus,
+                ToggleVisible = Hotkeys.ToggleVisible
             },
             PetLeft = PetLeft,
             PetTop = PetTop,

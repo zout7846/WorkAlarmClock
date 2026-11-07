@@ -13,11 +13,17 @@ public static class AppEnvironment
     public const string AppName = "WorkAlarmClock";
 
     /// <summary>单实例互斥体名称（Local\ 前缀保证仅当前用户会话）。</summary>
-    public const string SingleInstanceMutexName = @"Local\WorkAlarmClock_SingleInstance";
+    public static string SingleInstanceMutexName => @"Local\WorkAlarmClock_SingleInstance" + TestSuffix;
 
-    /// <summary>根数据目录：%LOCALAPPDATA%\WorkAlarmClock。</summary>
+    /// <summary>测试隔离后缀（环境变量 WORKALARM_TEST_SUFFIX），正式运行恒为空。</summary>
+    private static string TestSuffix =>
+        Environment.GetEnvironmentVariable("WORKALARM_TEST_SUFFIX") is { Length: > 0 } suffix ? "_" + suffix : string.Empty;
+
+    /// <summary>根数据目录：%LOCALAPPDATA%\WorkAlarmClock（测试隔离时追加后缀或使用 WORKALARM_TEST_ROOT）。</summary>
     public static string RootDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppName);
+        Environment.GetEnvironmentVariable("WORKALARM_TEST_ROOT") is { Length: > 0 } testRoot
+            ? testRoot
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppName + TestSuffix);
 
     /// <summary>每日数据目录：%LOCALAPPDATA%\WorkAlarmClock\data。</summary>
     public static string DataDirectory => Path.Combine(RootDirectory, "data");
@@ -98,7 +104,7 @@ public static class AppEnvironment
         }
         catch
         {
-            // 日志失败静默，绝不影响主流程。
+            // Logging must not interrupt the application.
         }
     }
 }
