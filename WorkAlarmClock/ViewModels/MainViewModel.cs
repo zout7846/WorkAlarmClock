@@ -76,6 +76,11 @@ public sealed class MainViewModel : ObservableObject
         OpenCountdownCommand = new RelayCommand(DialogManager.ShowCountdown);
         OpenWeatherCommand = new RelayCommand(DialogManager.ShowWeather);
         OpenSpeedTestCommand = new RelayCommand(DialogManager.ShowSpeedTest);
+        OpenCalculatorCommand = new RelayCommand(DialogManager.ShowCalculator);
+        OpenRadixConverterCommand = new RelayCommand(DialogManager.ShowRadixConverter);
+        OpenCodeToolCommand = new RelayCommand(DialogManager.ShowCodeTool);
+        OpenVariableNameGeneratorCommand = new RelayCommand(DialogManager.ShowVariableNameGenerator);
+        OpenImageConverterCommand = new RelayCommand(DialogManager.ShowImageConverter);
         FocusToggleCommand = new RelayCommand(ToggleFocus);
         FocusSkipCommand = new RelayCommand(() => AppServices.Focus.Skip());
         ToggleStatsCommand = new RelayCommand(() =>
@@ -373,6 +378,11 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>打开网络测速命令。</summary>
     public RelayCommand OpenSpeedTestCommand { get; }
+    public RelayCommand OpenCalculatorCommand { get; }
+    public RelayCommand OpenRadixConverterCommand { get; }
+    public RelayCommand OpenCodeToolCommand { get; }
+    public RelayCommand OpenVariableNameGeneratorCommand { get; }
+    public RelayCommand OpenImageConverterCommand { get; }
 
     /// <summary>开始/停止番茄钟命令。</summary>
     public RelayCommand FocusToggleCommand { get; }

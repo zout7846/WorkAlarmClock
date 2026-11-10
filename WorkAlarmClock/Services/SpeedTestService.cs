@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -136,6 +136,7 @@ public sealed class SpeedTestService : ISpeedTestService
         }
         catch (Exception ex)
         {
+            if (_phase == SpeedPhase.Upload) _uploadMbps = 0;
             AppEnvironment.Log("测速失败。", ex);
             SetPhase(SpeedPhase.Failed, "失败：" + ex.Message);
         }
@@ -288,10 +289,10 @@ public sealed class SpeedTestService : ISpeedTestService
         TimeSpan lastReport = TimeSpan.Zero;
         long lastSent = 0;
 
-        ProgressContent content = new ProgressContent(payload, sent =>
+        using ProgressContent content = new ProgressContent(payload, sent =>
         {
             TimeSpan elapsed = stopwatch.Elapsed;
-            if (elapsed - lastReport < ReportInterval)
+            if (elapsed - lastReport < ReportInterval && sent < payload.Length)
             {
                 return;
             }
@@ -316,9 +317,9 @@ public sealed class SpeedTestService : ISpeedTestService
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // 超时：保留过程中测得的平滑速度，不让整轮测速失败。
-            AppEnvironment.Log("上传测速超时，采用过程中的平均速率。");
-            return _uploadMbps;
+            // Bytes written to a local socket buffer do not prove a successful upload.
+            _uploadMbps = 0;
+            throw new TimeoutException("上传测速超时，未取得有效结果；下载结果已保留。");
         }
     }
 
@@ -365,7 +366,10 @@ public sealed class SpeedTestService : ISpeedTestService
             Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         }
 
-        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+            => SerializeToStreamAsync(stream, context, CancellationToken.None);
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context, CancellationToken cancellationToken)
         {
             const int chunk = 65536;
             long sent = 0;
@@ -373,7 +377,7 @@ public sealed class SpeedTestService : ISpeedTestService
             for (int offset = 0; offset < _data.Length; offset += chunk)
             {
                 int count = Math.Min(chunk, _data.Length - offset);
-                await stream.WriteAsync(_data.AsMemory(offset, count)).ConfigureAwait(false);
+                await stream.WriteAsync(_data.AsMemory(offset, count), cancellationToken).ConfigureAwait(false);
                 sent += count;
                 _onProgress(sent);
             }

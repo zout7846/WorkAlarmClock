@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -195,8 +196,24 @@ public sealed class NetworkMonitorService : INetworkMonitor, IDisposable
 /// </summary>
 public sealed class WeatherService : IWeatherService, IDisposable
 {
+    private static readonly TimeSpan WeatherRefreshInterval = TimeSpan.FromMinutes(5);
     private static readonly HttpClient Client = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
 
+    private static readonly HttpClient LocationClient = CreateLocationClient();
+    private static readonly TimeSpan LocationTimeout = TimeSpan.FromMilliseconds(2500);
+    private static readonly TimeSpan LocationCacheTtl = TimeSpan.FromHours(6);
+
+    private static HttpClient CreateLocationClient()
+    {
+        HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) WorkAlarmClock/2.0");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        return client;
+    }
+
+    private CancellationTokenSource? _refreshCancellation;
+    private Task? _locating;
+    public string StatusText { get; private set; } = string.Empty;
     private readonly ISettingsService _settings;
     private readonly DispatcherTimer _timer;
 
@@ -205,8 +222,8 @@ public sealed class WeatherService : IWeatherService, IDisposable
     public WeatherService(ISettingsService settings)
     {
         _settings = settings;
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-        _timer.Tick += async (_, _) => await RefreshAsync();
+        _timer = new DispatcherTimer { Interval = WeatherRefreshInterval };
+        _timer.Tick += async (_, _) => await LocateAsync(WeatherLocateTrigger.Periodic);
     }
 
     /// <inheritdoc />
@@ -219,9 +236,14 @@ public sealed class WeatherService : IWeatherService, IDisposable
     public void Start()
     {
         _timer.Start();
-        if (_settings.Current.WeatherAutoLocate)
+        if (_settings.Current.WeatherManualLocation)
         {
-            _ = LocateAsync();
+            AppEnvironment.Log("已启用手动地区：" + _settings.Current.WeatherCity + "，跳过 IP 定位。");
+            _ = RefreshAsync();
+        }
+        else if (_settings.Current.WeatherAutoLocate)
+        {
+            _ = LocateAsync(WeatherLocateTrigger.Startup);
         }
         else
         {
@@ -233,7 +255,13 @@ public sealed class WeatherService : IWeatherService, IDisposable
     public void Stop() => _timer.Stop();
 
     /// <inheritdoc />
-    public async Task LocateAsync()
+    public Task LocateAsync(WeatherLocateTrigger trigger = WeatherLocateTrigger.Startup)
+    {
+        if (_locating is { IsCompleted: false }) return _locating;
+        return _locating = LocateCoreAsync(trigger);
+    }
+
+    private async Task LocateCoreAsync(WeatherLocateTrigger trigger)
     {
         AppSettings settings = _settings.Current;
         if (!settings.WeatherEnabled)
@@ -241,17 +269,82 @@ public sealed class WeatherService : IWeatherService, IDisposable
             return;
         }
 
-        (string city, double lat, double lon)? located = await ResolveLocationAsync();
-        if (located is not null)
+        if (settings.WeatherManualLocation && trigger != WeatherLocateTrigger.Manual)
         {
-            AppSettings draft = _settings.Current.Clone();
-            draft.WeatherCity = located.Value.city;
-            draft.WeatherLatitude = located.Value.lat;
-            draft.WeatherLongitude = located.Value.lon;
-            _settings.TryUpdate(draft);
-            AppEnvironment.Log("IP 定位成功：" + located.Value.city + " (" +
-                located.Value.lat.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + ", " +
-                located.Value.lon.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + ")");
+            AppEnvironment.Log("已启用手动地区，跳过 IP 定位。");
+            await RefreshAsync();
+            return;
+        }
+
+        if (trigger != WeatherLocateTrigger.Manual && (!settings.WeatherAutoLocate || HasFreshLocation(settings)))
+        {
+            AppEnvironment.Log("IP 定位缓存仍有效，跳过本次联网定位。");
+            await RefreshAsync();
+            return;
+        }
+
+        LocationResolution? located = await ResolveLocationAsync();
+        // A manual change made while probes were running always wins.
+        if (_settings.Current.WeatherManualLocation != settings.WeatherManualLocation ||
+            _settings.Current.WeatherCity != settings.WeatherCity ||
+            _settings.Current.WeatherLatitude != settings.WeatherLatitude ||
+            _settings.Current.WeatherLongitude != settings.WeatherLongitude)
+        {
+            await RefreshAsync();
+            return;
+        }
+        if (located is not null && !located.AnyDomestic)
+        {
+            AppEnvironment.Log(trigger == WeatherLocateTrigger.Manual
+                ? "按 IP 重新定位得到境外结果（很可能是应用走了代理/VPN），已保留原有地区设置；如需切换请在设置中手动指定地区。"
+                : "IP 定位结果均判定为境外（很可能是应用走了代理/VPN），为保护已有地区设置，本次不写回城市与坐标；如需更新请在设置中手动指定地区。");
+            await RefreshAsync();
+            StatusText += " · IP 返回境外位置，已保留原地区，请检查代理或手动选城市";
+            Updated?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        if (located is not null && ValidCoords(located.Lat, located.Lon))
+        {
+            bool coordinatesUnchanged = !ValidCoords(located.Lat, located.Lon)
+                || (Math.Abs(settings.WeatherLatitude - located.Lat) < 0.0001
+                    && Math.Abs(settings.WeatherLongitude - located.Lon) < 0.0001);
+
+            if (trigger == WeatherLocateTrigger.Periodic
+                && !settings.WeatherManualLocation
+                && string.Equals(settings.WeatherCity, located.City, StringComparison.Ordinal)
+                && coordinatesUnchanged)
+            {
+                AppEnvironment.Log("IP 定位结果无变化，跳过写回设置。");
+            }
+            else
+            {
+                AppSettings draft = _settings.Current.Clone();
+                draft.WeatherCity = located.City;
+                if (ValidCoords(located.Lat, located.Lon))
+                {
+                    draft.WeatherLatitude = located.Lat;
+                    draft.WeatherLongitude = located.Lon;
+                }
+
+                draft.WeatherLocatedAt = DateTimeOffset.Now;
+                if (trigger == WeatherLocateTrigger.Manual)
+                {
+                    draft.WeatherManualLocation = false;
+                    draft.WeatherAutoLocate = true;
+                }
+
+                var saved = _settings.TryUpdate(draft);
+                if (!saved.Ok)
+                {
+                    StatusText = saved.Error ?? "定位地区保存失败";
+                    Updated?.Invoke(this, EventArgs.Empty);
+                    return;
+                }
+                AppEnvironment.Log("IP 定位成功：" + located.City + " (" +
+                    located.Lat.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + ", " +
+                    located.Lon.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + ")，来源：IP 多源合并");
+            }
         }
         else
         {
@@ -259,54 +352,260 @@ public sealed class WeatherService : IWeatherService, IDisposable
         }
 
         await RefreshAsync();
+        if (located is null || !ValidCoords(located.Lat, located.Lon))
+        {
+            StatusText += " · 定位未取得可靠城市坐标，已保留原地区";
+            Updated?.Invoke(this, EventArgs.Empty);
+        }
     }
 
-    /// <summary>通过公网 IP 解析地理位置（依次尝试多个免费接口，均无需 Key）。</summary>
-    private static async Task<(string city, double lat, double lon)?> ResolveLocationAsync()
+    /// <summary>近期是否成功定位过（用于跳过重复的联网定位）。</summary>
+    private static bool HasFreshLocation(AppSettings s)
     {
-        string[] urls =
+        if (s.WeatherLocatedAt is not DateTimeOffset locatedAt)
         {
-            "https://ipwho.is/",
-            "https://ipapi.co/json/",
-            "http://ip-api.com/json/?lang=zh-CN"
+            return false;
+        }
+
+        DateTimeOffset now = DateTimeOffset.Now;
+        return locatedAt >= now - LocationCacheTtl
+            && locatedAt <= now
+            && ValidCoords(s.WeatherLatitude, s.WeatherLongitude)
+            && !string.IsNullOrWhiteSpace(s.WeatherCity);
+    }
+
+    /// <summary>通过公网 IP 并发解析地理位置（多源合并，均无需 Key）。</summary>
+    private static async Task<LocationResolution?> ResolveLocationAsync()
+    {
+        using CancellationTokenSource cts = new CancellationTokenSource(LocationTimeout);
+        Stopwatch sw = Stopwatch.StartNew();
+        Task<IpProbe?>[] tasks =
+        {
+            SafeProbeAsync("ipwho.is", ProbeIpWhoIsAsync, cts.Token),
+            SafeProbeAsync("ipip.net", ProbeIpIpNetAsync, cts.Token),
+            SafeProbeAsync("ip-api.com", ProbeIpApiAsync, cts.Token)
         };
+        IpProbe?[] all = await Task.WhenAll(tasks);
+        List<IpProbe> probes = all.Where(p => p is not null).Select(p => p!).ToList();
+        sw.Stop();
+        LocationResolution? merged = MergeLocation(probes);
+        AppEnvironment.Log(merged is null
+            ? $"IP 定位失败：无可用数据源（用时 {sw.ElapsedMilliseconds}ms），沿用已有坐标。"
+            : $"IP 定位完成：{merged.City} ({merged.Lat:0.####}, {merged.Lon:0.####})，用时 {sw.ElapsedMilliseconds}ms");
+        return merged;
+    }
 
-        foreach (string url in urls)
+    /// <summary>合并多个定位源：境内中文城市优先、境内坐标优先、坐标与城市不一致时舍弃境外坐标。</summary>
+    private static LocationResolution? MergeLocation(IReadOnlyList<IpProbe> probes)
+    {
+        if (probes.Count == 0)
         {
-            try
+            return null;
+        }
+
+        // Vote on normalized city names, never combine different cities' coordinates.
+        var candidates = probes.Where(p => p.Domestic && !string.IsNullOrWhiteSpace(p.City))
+            .GroupBy(p => NormalizeCity(LocalizeCity(p.City)), StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count()).ToList();
+        if (candidates.Count == 0) return null;
+        var winner = candidates[0];
+        if (candidates.Count > 1 && winner.Count() < 2)
+        {
+            AppEnvironment.Log("IP 定位来源城市不一致，保留原地区，建议手动选择。");
+            return null;
+        }
+        string city = winner.Key;
+        CityPreset? preset = CityPresets.All.FirstOrDefault(p => p.Name == city);
+        IpProbe? geo = winner.FirstOrDefault(p => p.HasCoordinates);
+        double lat = preset?.Latitude ?? geo?.Latitude ?? 0;
+        double lon = preset?.Longitude ?? geo?.Longitude ?? 0;
+        bool anyDomestic = true;
+        return new LocationResolution(city, lat, lon, anyDomestic);
+    }
+
+    /// <summary>单个 IP 定位源的探测结果。</summary>
+    private sealed record IpProbe(string Source, string City, string Region, string Country,
+        string CountryCode, double Latitude, double Longitude, bool HasCoordinates, bool Domestic);
+
+    /// <summary>融合后的定位结果；AnyDomestic 表示本次有效探针中是否至少有一个判定为境内。</summary>
+    private sealed record LocationResolution(string City, double Lat, double Lon, bool AnyDomestic);
+
+    private static string Str(JsonElement e, string name) =>
+        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out JsonElement v) && v.ValueKind == JsonValueKind.String
+            ? v.GetString() ?? string.Empty
+            : string.Empty;
+
+    private static double Num(JsonElement e, string name) =>
+        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out JsonElement v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out double d)
+            ? d
+            : 0;
+
+    private static bool ValidCoords(double lat, double lon) =>
+        lat is > -90 and < 90 && lon is > -180 and < 180 && (lat != 0 || lon != 0);
+
+    private static bool IsDomestic(string country, string code) =>
+        code.Equals("CN", StringComparison.OrdinalIgnoreCase) || country.Contains("中国", StringComparison.Ordinal);
+
+    private static bool HasChinese(string s) => s.Any(c => c is >= '\u4E00' and <= '\u9FFF');
+
+    /// <summary>去掉城市名尾部的行政区后缀（如「成都市」→「成都」）。</summary>
+    private static string NormalizeCity(string city)
+    {
+        string s = (city ?? string.Empty).Trim();
+        string[] suffixes = { "特别行政区", "维吾尔自治区", "壮族自治区", "回族自治区", "自治区", "自治州", "地区", "市" };
+        foreach (string suffix in suffixes)
+        {
+            if (s.Length > suffix.Length && s.EndsWith(suffix, StringComparison.Ordinal))
             {
-                string json = await Client.GetStringAsync(url);
-                using JsonDocument document = JsonDocument.Parse(json);
-                JsonElement root = document.RootElement;
-
-                string city = root.TryGetProperty("city", out JsonElement cityEl) && cityEl.ValueKind == JsonValueKind.String
-                    ? cityEl.GetString() ?? string.Empty
-                    : string.Empty;
-
-                double lat = 0;
-                double lon = 0;
-                if (root.TryGetProperty("latitude", out JsonElement latEl))
-                {
-                    lat = latEl.GetDouble();
-                }
-
-                if (root.TryGetProperty("longitude", out JsonElement lonEl))
-                {
-                    lon = lonEl.GetDouble();
-                }
-
-                if (lat is > -90 and < 90 && lon is > -180 and < 180 && (lat != 0 || lon != 0))
-                {
-                    return (LocalizeCity(city), lat, lon);
-                }
-            }
-            catch (Exception ex)
-            {
-                AppEnvironment.Log("IP 定位接口失败：" + url, ex);
+                s = s.Substring(0, s.Length - suffix.Length);
+                break;
             }
         }
 
-        return null;
+        return s.Trim();
+    }
+
+    /// <summary>取回原始 JSON 字节并跳过 UTF-8 BOM / 前导空白，避开字符串编码问题。</summary>
+    private static async Task<JsonDocument> FetchJsonAsync(string url, CancellationToken ct)
+    {
+        byte[] bytes = await LocationClient.GetByteArrayAsync(url, ct);
+        int start = 0;
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+        {
+            start = 3;
+        }
+
+        while (start < bytes.Length && IsWhitespace(bytes[start]))
+        {
+            start++;
+        }
+
+        return JsonDocument.Parse(new ReadOnlyMemory<byte>(bytes, start, bytes.Length - start));
+    }
+
+    private static bool IsWhitespace(byte b) => b == 0x20 || b == 0x09 || b == 0x0D || b == 0x0A;
+
+    /// <summary>ipwho.is：顶层 city/region/country/country_code/latitude/longitude，success=false 视为失败。</summary>
+    private static async Task<IpProbe?> ProbeIpWhoIsAsync(CancellationToken ct)
+    {
+        using JsonDocument doc = await FetchJsonAsync("https://ipwho.is/", ct);
+        JsonElement root = doc.RootElement;
+        if (root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("success", out JsonElement ok)
+            && ok.ValueKind == JsonValueKind.False)
+        {
+            return null;
+        }
+
+        string city = Str(root, "city");
+        string region = Str(root, "region");
+        string country = Str(root, "country");
+        string code = Str(root, "country_code");
+        double lat = Num(root, "latitude");
+        double lon = Num(root, "longitude");
+        bool hasCoords = ValidCoords(lat, lon);
+        if (string.IsNullOrWhiteSpace(city) && !hasCoords)
+        {
+            return null;
+        }
+
+        return new IpProbe("ipwho.is", city, region, country, code, lat, lon, hasCoords, IsDomestic(country, code));
+    }
+
+    /// <summary>myip.ipip.net：data.location 数组 [国家, 省, 城市, ...]，无经纬度。</summary>
+    private static async Task<IpProbe?> ProbeIpIpNetAsync(CancellationToken ct)
+    {
+        using JsonDocument doc = await FetchJsonAsync("https://myip.ipip.net/json", ct);
+        JsonElement root = doc.RootElement;
+        if (!string.Equals(Str(root, "ret"), "ok", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (!root.TryGetProperty("data", out JsonElement data)
+            || data.ValueKind != JsonValueKind.Object
+            || !data.TryGetProperty("location", out JsonElement loc)
+            || loc.ValueKind != JsonValueKind.Array
+            || loc.GetArrayLength() < 3)
+        {
+            return null;
+        }
+
+        string country = loc[0].ValueKind == JsonValueKind.String ? loc[0].GetString() ?? string.Empty : string.Empty;
+        string region = loc[1].ValueKind == JsonValueKind.String ? loc[1].GetString() ?? string.Empty : string.Empty;
+        string city = loc[2].ValueKind == JsonValueKind.String ? loc[2].GetString() ?? string.Empty : string.Empty;
+        if (string.IsNullOrWhiteSpace(city))
+        {
+            return null;
+        }
+
+        bool domestic = IsDomestic(country, string.Empty);
+        return new IpProbe("ipip.net", city, region, country,
+            domestic ? "CN" : string.Empty, 0, 0, false, domestic);
+    }
+
+    /// <summary>ip-api.com：status/city/regionName/country/countryCode/lat/lon（注意是 lat/lon）。</summary>
+    private static async Task<IpProbe?> ProbeIpApiAsync(CancellationToken ct)
+    {
+        using JsonDocument doc = await FetchJsonAsync("http://ip-api.com/json/?lang=zh-CN", ct);
+        JsonElement root = doc.RootElement;
+        if (!string.Equals(Str(root, "status"), "success", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string city = Str(root, "city");
+        string region = Str(root, "regionName");
+        string country = Str(root, "country");
+        string code = Str(root, "countryCode");
+        double lat = Num(root, "lat");
+        double lon = Num(root, "lon");
+        bool hasCoords = ValidCoords(lat, lon);
+        if (string.IsNullOrWhiteSpace(city) && !hasCoords)
+        {
+            return null;
+        }
+
+        return new IpProbe("ip-api.com", city, region, country, code, lat, lon, hasCoords, IsDomestic(country, code));
+    }
+
+    /// <summary>包裹单个探针：计时、吞掉所有异常，保证 Task.WhenAll 不抛。</summary>
+    private static async Task<IpProbe?> SafeProbeAsync(string name, Func<CancellationToken, Task<IpProbe?>> probe, CancellationToken ct)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            IpProbe? result = await probe(ct);
+            sw.Stop();
+            if (result is not null)
+            {
+                AppEnvironment.Log($"IP 定位源 {name}：{result.City} / {result.Country} / 坐标{(result.HasCoordinates ? "有" : "无")}（{sw.ElapsedMilliseconds}ms）");
+            }
+            else
+            {
+                AppEnvironment.Log($"IP 定位源 {name}：无有效结果（{sw.ElapsedMilliseconds}ms）");
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            sw.Stop();
+            AppEnvironment.Log($"IP 定位源 {name}：超时取消（{sw.ElapsedMilliseconds}ms）");
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            AppEnvironment.Log($"IP 定位源 {name}：请求失败 {ex.Message}（{sw.ElapsedMilliseconds}ms）");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            AppEnvironment.Log($"IP 定位源 {name}：失败（{sw.ElapsedMilliseconds}ms）", ex);
+            return null;
+        }
     }
 
     /// <summary>常见城市英文名转中文（找不到则原样返回）。</summary>
@@ -336,6 +635,82 @@ public sealed class WeatherService : IWeatherService, IDisposable
             "Kunming" => "昆明",
             "Harbin" => "哈尔滨",
             "Shenyang" => "沈阳",
+            "Taipei" => "台北",
+            "Hong Kong" => "香港",
+            "Macau" or "Macao" => "澳门",
+            "Ningbo" => "宁波",
+            "Wuxi" => "无锡",
+            "Dongguan" => "东莞",
+            "Foshan" => "佛山",
+            "Jinan" => "济南",
+            "Nanchang" => "南昌",
+            "Guiyang" => "贵阳",
+            "Nanning" => "南宁",
+            "Lanzhou" => "兰州",
+            "Taiyuan" => "太原",
+            "Shijiazhuang" => "石家庄",
+            "Haikou" => "海口",
+            "Sanya" => "三亚",
+            "Urumqi" or "Urumchi" => "乌鲁木齐",
+            "Lhasa" => "拉萨",
+            "Hohhot" => "呼和浩特",
+            "Changchun" => "长春",
+            "Zhuhai" => "珠海",
+            "Zhongshan" => "中山",
+            "Huizhou" => "惠州",
+            "Shantou" => "汕头",
+            "Zhanjiang" => "湛江",
+            "Jiangmen" => "江门",
+            "Zhaoqing" => "肇庆",
+            "Wenzhou" => "温州",
+            "Shaoxing" => "绍兴",
+            "Jiaxing" => "嘉兴",
+            "Taizhou" => "台州",
+            "Jinhua" => "金华",
+            "Quanzhou" => "泉州",
+            "Yantai" => "烟台",
+            "Weifang" => "潍坊",
+            "Zibo" => "淄博",
+            "Xuzhou" => "徐州",
+            "Changzhou" => "常州",
+            "Nantong" => "南通",
+            "Yangzhou" => "扬州",
+            "Yancheng" => "盐城",
+            "Luoyang" => "洛阳",
+            "Tangshan" => "唐山",
+            "Baoding" => "保定",
+            "Langfang" => "廊坊",
+            "Qinhuangdao" => "秦皇岛",
+            "Baotou" => "包头",
+            "Jilin" => "吉林",
+            "Anshan" => "鞍山",
+            "Daqing" => "大庆",
+            "Wuhu" => "芜湖",
+            "Bengbu" => "蚌埠",
+            "Jiujiang" => "九江",
+            "Ganzhou" => "赣州",
+            "Yichang" => "宜昌",
+            "Xiangyang" => "襄阳",
+            "Jingzhou" => "荆州",
+            "Zhuzhou" => "株洲",
+            "Xiangtan" => "湘潭",
+            "Yueyang" => "岳阳",
+            "Hengyang" => "衡阳",
+            "Guilin" => "桂林",
+            "Liuzhou" => "柳州",
+            "Mianyang" => "绵阳",
+            "Deyang" => "德阳",
+            "Yibin" => "宜宾",
+            "Zunyi" => "遵义",
+            "Qujing" => "曲靖",
+            "Dali" => "大理",
+            "Lijiang" => "丽江",
+            "Yanan" => "延安",
+            "Baoji" => "宝鸡",
+            "Xianyang" => "咸阳",
+            "Tianshui" => "天水",
+            "Yinchuan" => "银川",
+            "Xining" => "西宁",
             _ => city.Trim()
         };
     }
@@ -343,23 +718,43 @@ public sealed class WeatherService : IWeatherService, IDisposable
     /// <inheritdoc />
     public async Task RefreshAsync()
     {
-        AppSettings settings = _settings.Current;
+        AppSettings settings = _settings.Current.Clone();
         if (!settings.WeatherEnabled)
         {
+            StatusText = "天气功能未启用，请在设置中开启";
+            Updated?.Invoke(this, EventArgs.Empty);
             return;
         }
-
+        if (!ValidCoords(settings.WeatherLatitude, settings.WeatherLongitude) || string.IsNullOrWhiteSpace(settings.WeatherCity))
+        {
+            StatusText = "请先重新定位，或在设置中选择城市";
+            Updated?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+        _refreshCancellation?.Cancel();
+        using CancellationTokenSource request = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        _refreshCancellation = request;
+        StatusText = "正在更新天气…";
+        Updated?.Invoke(this, EventArgs.Empty);
         try
         {
             string url = string.Format(
                 System.Globalization.CultureInfo.InvariantCulture,
                 "https://api.open-meteo.com/v1/forecast?latitude={0:0.####}&longitude={1:0.####}" +
                 "&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                "&timezone=auto&forecast_days=3",
+                "&hourly=temperature_2m,precipitation_probability,precipitation&timezone=auto&forecast_days=3",
                 settings.WeatherLatitude,
                 settings.WeatherLongitude);
 
-            string json = await Client.GetStringAsync(url);
+            using HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Get, url);
+            message.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
+            using HttpResponseMessage response = await Client.SendAsync(message, request.Token);
+            response.EnsureSuccessStatusCode();
+            string json = await response.Content.ReadAsStringAsync(request.Token);
+            request.Token.ThrowIfCancellationRequested();
+            if (_settings.Current.WeatherLatitude != settings.WeatherLatitude ||
+                _settings.Current.WeatherLongitude != settings.WeatherLongitude ||
+                _settings.Current.WeatherCity != settings.WeatherCity) return;
             using JsonDocument document = JsonDocument.Parse(json);
             JsonElement root = document.RootElement;
 
@@ -385,21 +780,51 @@ public sealed class WeatherService : IWeatherService, IDisposable
                     Glyph(dayCode)));
             }
 
+            TimeSpan offset = TimeSpan.FromSeconds(root.GetProperty("utc_offset_seconds").GetInt32());
+            DateTimeOffset ParseTime(string value) => new DateTimeOffset(
+                DateTime.SpecifyKind(DateTime.Parse(value, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Unspecified), offset);
+            List<HourlyForecast> hours = new();
+            if (root.TryGetProperty("hourly", out JsonElement hourly))
+            {
+                JsonElement hourTimes = hourly.GetProperty("time");
+                double? Value(string key, int index) => hourly.TryGetProperty(key, out JsonElement values)
+                    && index < values.GetArrayLength() && values[index].TryGetDouble(out double number) ? number : null;
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                for (int i = 0; i < hourTimes.GetArrayLength() && hours.Count < 24; i++)
+                {
+                    DateTimeOffset time = ParseTime(hourTimes[i].GetString()!);
+                    if (time < now.AddHours(-1)) continue;
+                    if (Value("temperature_2m", i) is not double temp) continue;
+                    hours.Add(new HourlyForecast(time, temp, Value("precipitation_probability", i), Value("precipitation", i)));
+                }
+            }
             Current = new WeatherSnapshot(
                 settings.WeatherCity,
                 Math.Round(temperature, 1),
                 Describe(code),
                 Glyph(code),
                 DateTimeOffset.Now,
-                days);
+                days)
+            {
+                Hours = hours,
+                ObservedAt = ParseTime(current.GetProperty("time").GetString()!)
+            };
+            StatusText = "天气已更新 · Open-Meteo";
 
             AppEnvironment.Log("天气已更新：" + Current.City + " " + Current.Temperature + "°C " + Current.Description);
             Updated?.Invoke(this, EventArgs.Empty);
         }
+        catch (OperationCanceledException) when (!ReferenceEquals(_refreshCancellation, request)) { }
         catch (Exception ex)
         {
-            // 网络波动时不打扰用户，保留上一次成功的数据。
+            StatusText = Current is null ? "更新失败，请检查网络后重试" : "更新失败，当前显示上次成功数据";
+            Updated?.Invoke(this, EventArgs.Empty);
+            // Preserve the last successful snapshot.
             AppEnvironment.Log("刷新天气失败。", ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_refreshCancellation, request)) _refreshCancellation = null;
         }
     }
 

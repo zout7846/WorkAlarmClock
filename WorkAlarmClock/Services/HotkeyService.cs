@@ -66,9 +66,7 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
         if (failures.Count > 0)
         {
             string keys = string.Join(", ", failures);
-            _source.Dispatcher.BeginInvoke(new Action(() =>
-                System.Windows.MessageBox.Show("以下全局热键注册失败：" + keys + "\n组合键可能已被其他程序占用，请在设置中更换。详情见日志。", "WorkAlarmClock",
-                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning)));
+            PageNotifications.Publish("快捷键注册失败", keys + " 可能已被其他程序占用，请在设置 → 热键中更换。", "错误");
         }
     }
 
@@ -138,6 +136,9 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
                 break;
             case HotkeyAction.ToggleVisible:
                 actions.ToggleVisible();
+                break;
+            case HotkeyAction.VariableNameGenerator:
+                actions.OpenVariableNameGenerator();
                 break;
         }
     }

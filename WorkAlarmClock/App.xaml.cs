@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using WorkAlarmClock.Infrastructure;
 using WorkAlarmClock.Services;
 using WorkAlarmClock.ViewModels;
+using WorkAlarmClock.Views;
 
 namespace WorkAlarmClock
 {
@@ -74,6 +75,7 @@ namespace WorkAlarmClock
 
                 AppEnvironment.Log("桌宠窗口已显示。");
 
+
                 // 测试钩子：WORKALARM_TEST_ROI="x,y,w,h" 时启动后自动触发一次区域截图，
                 // 用于自动化验证「裁剪 → 标注窗口」的比例是否正确。
                 if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WORKALARM_TEST_ROI")))
@@ -134,6 +136,18 @@ namespace WorkAlarmClock
             }
         }
 
+        internal static void ShowSettingsPage()
+        {
+            ShowMainPanel();
+            _mainWindow?.ShowSettingsPage();
+        }
+
+        internal static void ShowToolsPage()
+        {
+            ShowMainPanel();
+            _mainWindow?.ShowToolsPage();
+        }
+
         /// <summary>显示（或激活）主面板。</summary>
         internal static void ShowMainPanel()
         {
@@ -182,11 +196,7 @@ namespace WorkAlarmClock
         private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
             AppEnvironment.Log(e.Exception);
-            System.Windows.MessageBox.Show(
-                "出现未处理的异常，已记录日志：" + e.Exception.Message,
-                "WorkAlarmClock",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            PageNotifications.Publish("操作未完成", e.Exception.Message + "（详情已记录日志）", "错误");
             e.Handled = true;
         }
 
@@ -237,6 +247,8 @@ namespace WorkAlarmClock
         void IHotkeyActions.TogglePet() => AppServices.RaisePetToggle();
 
         void IHotkeyActions.ToggleVisible() => HideShowPetWindow();
+
+        void IHotkeyActions.OpenVariableNameGenerator() => DialogManager.ShowVariableNameGenerator();
 
         /// <summary>显示/隐藏当前形态（桌宠或灵动岛）。</summary>
         private static void HideShowPetWindow()

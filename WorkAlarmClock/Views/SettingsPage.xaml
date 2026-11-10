@@ -1,0 +1,471 @@
+<UserControl x:Class="WorkAlarmClock.Views.SettingsPage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:views="clr-namespace:WorkAlarmClock.Views"
+ FontFamily="Microsoft YaHei UI" Background="#F2F7FD">
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 校验错误红字 -->
+        <TextBlock Grid.Row="0" Text="{Binding ValidationError}" Foreground="#FFEB5757"
+                   FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ValidationError}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding ValidationError}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <Trigger Property="Text" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <TabControl Grid.Row="1" TabStripPlacement="Top" Background="White" BorderBrush="#DDEAF7" Padding="16" >
+
+
+            <!-- ============ 作息 ============ -->
+            <TabItem Header="作息">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                    <StackPanel Margin="6">
+                        <TextBlock Text="上下班时间" Style="{StaticResource SectionTitleStyle}" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <TextBlock Text="上班" Width="88" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:TimeComboBox SelectedTime="{Binding Draft.WorkStartTime}" GranularityMinutes="30" Width="90" />
+                            <TextBlock Text="下班" Margin="20,0,0,0" Width="44" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:TimeComboBox SelectedTime="{Binding Draft.WorkEndTime}" GranularityMinutes="30" Width="90" />
+                        </WrapPanel>
+
+                        <CheckBox Content="启用午休" IsChecked="{Binding Draft.LunchEnabled}" Margin="0,0,0,8" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="午休" Width="88" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:TimeComboBox SelectedTime="{Binding Draft.LunchStartTime}" GranularityMinutes="30" Width="90" IsEnabled="{Binding Draft.LunchEnabled}" />
+                            <TextBlock Text="至" Margin="12,0,12,0" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:TimeComboBox SelectedTime="{Binding Draft.LunchEndTime}" GranularityMinutes="30" Width="90" IsEnabled="{Binding Draft.LunchEnabled}" />
+                        </WrapPanel>
+
+                        <TextBlock Text="工作日（勾选的日子才自动计时与提醒）" Style="{StaticResource SectionTitleStyle}" Margin="0,16,0,6" />
+                        <UniformGrid Columns="7" Margin="0,0,0,4">
+                            <CheckBox Content="日" IsChecked="{Binding Draft.Workdays[0], Mode=TwoWay}" HorizontalAlignment="Center" />
+                            <CheckBox Content="一" IsChecked="{Binding Draft.Workdays[1], Mode=TwoWay}" HorizontalAlignment="Center" />
+                            <CheckBox Content="二" IsChecked="{Binding Draft.Workdays[2], Mode=TwoWay}" HorizontalAlignment="Center" />
+                            <CheckBox Content="三" IsChecked="{Binding Draft.Workdays[3], Mode=TwoWay}" HorizontalAlignment="Center" />
+                            <CheckBox Content="四" IsChecked="{Binding Draft.Workdays[4], Mode=TwoWay}" HorizontalAlignment="Center" />
+                            <CheckBox Content="五" IsChecked="{Binding Draft.Workdays[5], Mode=TwoWay}" HorizontalAlignment="Center" />
+                            <CheckBox Content="六" IsChecked="{Binding Draft.Workdays[6], Mode=TwoWay}" HorizontalAlignment="Center" />
+                        </UniformGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ 提醒 ============ -->
+            <TabItem Header="提醒">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                    <StackPanel Margin="6">
+                        <TextBlock Text="弱提醒（写日报）" Style="{StaticResource SectionTitleStyle}" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <CheckBox Content="启用" IsChecked="{Binding Draft.WeakReminderEnabled}" Width="70" VerticalAlignment="Center" />
+                            <TextBlock Text="提前" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding WeakLeadText, UpdateSourceTrigger=PropertyChanged}" Width="72" Margin="6,0" />
+                            <TextBlock Text="分钟" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+
+                        <TextBlock Text="强提醒（打卡）" Style="{StaticResource SectionTitleStyle}" Margin="0,14,0,6" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <CheckBox Content="启用" IsChecked="{Binding Draft.StrongReminderEnabled}" Width="70" VerticalAlignment="Center" />
+                            <TextBlock Text="提前" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding StrongLeadText, UpdateSourceTrigger=PropertyChanged}" Width="72" Margin="6,0" />
+                            <TextBlock Text="分钟" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+                        <CheckBox Content="允许忽略（默认关闭，必须确认已打卡）"
+                                  IsChecked="{Binding Draft.StrongAllowIgnore}" Margin="0,0,0,8" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBlock Text="重复间隔" Width="88" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding StrongRepeatIntervalText, UpdateSourceTrigger=PropertyChanged}" Width="72" />
+                            <TextBlock Text="秒，最多重复" Margin="10,0" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding StrongRepeatMaxCountText, UpdateSourceTrigger=PropertyChanged}" Width="64" />
+                            <TextBlock Text="次" Margin="6,0,0,0" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+
+                        <CheckBox Content="开启提醒提示音" IsChecked="{Binding Draft.SoundEnabled}" Margin="0,10,0,0" />
+
+                        <TextBlock Text="健康提醒（只在「工作中」计时，休息后自动清零）"
+                                   Style="{StaticResource SectionTitleStyle}" Margin="0,18,0,6" TextWrapping="Wrap" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <CheckBox Content="久坐提醒" IsChecked="{Binding Draft.HealthSitEnabled}"
+                                      Width="96" VerticalAlignment="Center" />
+                            <TextBlock Text="每" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.HealthSitIntervalMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="72" Margin="6,0" />
+                            <TextBlock Text="分钟提醒起身活动" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+                        <WrapPanel Orientation="Horizontal">
+                            <CheckBox Content="喝水提醒" IsChecked="{Binding Draft.HealthDrinkEnabled}"
+                                      Width="96" VerticalAlignment="Center" />
+                            <TextBlock Text="每" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.HealthDrinkIntervalMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="72" Margin="6,0" />
+                            <TextBlock Text="分钟提醒补水" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+                        <TextBlock Text="气泡出现在桌宠上，点「已起身」可重置久坐计时。"
+                                   Style="{StaticResource HintTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                        <TextBlock Text="番茄钟（专注期间自动暂停久坐/喝水提醒）"
+                                   Style="{StaticResource SectionTitleStyle}" Margin="0,18,0,8" TextWrapping="Wrap" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBlock Text="专注" Width="38" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.PomodoroFocusMinutes, UpdateSourceTrigger=PropertyChanged}" Width="48" />
+                            <TextBlock Text="分钟，休息" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.PomodoroBreakMinutes, UpdateSourceTrigger=PropertyChanged}" Width="48" />
+                            <TextBlock Text="分钟，长休息" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.PomodoroLongBreakMinutes, UpdateSourceTrigger=PropertyChanged}" Width="48" />
+                            <TextBlock Text="分钟" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBlock Text="每" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.PomodoroRounds, UpdateSourceTrigger=PropertyChanged}" Width="48" Margin="6,0" />
+                            <TextBlock Text="轮进入一次长休息" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+                        <CheckBox Content="专注结束后自动开始休息" IsChecked="{Binding Draft.PomodoroAutoBreak}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ 检测 ============ -->
+            <TabItem Header="检测">
+                <StackPanel Margin="10">
+                    <TextBlock Text="锁屏与空闲" Style="{StaticResource SectionTitleStyle}" />
+                    <CheckBox Content="锁屏即休息（锁屏时段计入休息）"
+                              IsChecked="{Binding Draft.LockAsRest}" Margin="0,0,0,10" />
+                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="空闲阈值" Width="88" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        <TextBox Text="{Binding IdleThresholdText, UpdateSourceTrigger=PropertyChanged}" Width="72" />
+                        <TextBlock Text="分钟（超过即自动休息）" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                    </WrapPanel>
+                    <CheckBox Content="空闲时段也计入工作时长（锁屏始终计入休息）"
+                              IsChecked="{Binding Draft.CountIdleAsWork}" Margin="0,0,0,10" />
+                    <TextBlock Text="提示：回来后自动恢复工作并弹气泡「已恢复工作，点此纠正」。"
+                               Style="{StaticResource HintTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- ============ 外观 ============ -->
+            <TabItem Header="外观">
+                <StackPanel Margin="10">
+                    <TextBlock Text="桌宠透明度（拖动即时生效）" Style="{StaticResource SectionTitleStyle}" />
+                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Slider Minimum="0.2" Maximum="1.0" Width="280"
+                                Value="{Binding PetOpacity, UpdateSourceTrigger=PropertyChanged}"
+                                TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding PetOpacity, StringFormat=P0}" Margin="12,0,0,0"
+                                   VerticalAlignment="Center" Width="44"
+                                   Style="{StaticResource PillValueStyle}" />
+                    </WrapPanel>
+
+                    <TextBlock Text="桌宠大小（保存后生效；高分屏可适当放大）"
+                               Style="{StaticResource SectionTitleStyle}" Margin="0,16,0,6" TextWrapping="Wrap" />
+                    <WrapPanel Orientation="Horizontal">
+                        <Slider Minimum="0.8" Maximum="1.5" Width="280"
+                                Value="{Binding Draft.PetScale, UpdateSourceTrigger=PropertyChanged}"
+                                TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Draft.PetScale, StringFormat={}{0:P0}}" Margin="12,0,0,0"
+                                   VerticalAlignment="Center" Width="48"
+                                   Style="{StaticResource PillValueStyle}" />
+                    </WrapPanel>
+
+                    <CheckBox Content="拖拽桌宠时自动吸附屏幕边缘" IsChecked="{Binding Draft.SnapToEdges}"
+                              Margin="0,14,0,0" />
+
+                    <TextBlock Text="发色（保存后生效）"
+                               Style="{StaticResource SectionTitleStyle}" Margin="0,16,0,8" />
+                    <ListBox ItemsSource="{Binding PetSkinOptions}"
+                             SelectedValue="{Binding SelectedSkin}" SelectedValuePath="Value"
+                             Background="Transparent" BorderThickness="0" Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Margin" Value="0,0,8,8" />
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Chip" CornerRadius="12" BorderThickness="1.5"
+                                                    BorderBrush="{StaticResource BrushBorder}"
+                                                    Background="#FFFFFFFF" Padding="11,6">
+                                                <WrapPanel Orientation="Horizontal">
+                                                    <Ellipse Width="16" Height="16" Fill="{Binding Swatch}" />
+                                                    <TextBlock Text="{Binding Text}" FontSize="12" Margin="7,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{StaticResource BrushTextPrimary}" />
+                                                </WrapPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Chip" Property="BorderBrush"
+                                                            Value="{StaticResource BrushBorderStrong}" />
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Chip" Property="BorderBrush"
+                                                            Value="{StaticResource BrushAccent}" />
+                                                    <Setter TargetName="Chip" Property="Background"
+                                                            Value="{StaticResource BrushAccentLight}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+
+                    <TextBlock Text="桌宠素材（自定义图片，保存后生效）"
+                               Style="{StaticResource SectionTitleStyle}" Margin="0,16,0,8" />
+                    <WrapPanel Orientation="Horizontal">
+                        <Border Width="88" Height="120" CornerRadius="12" Background="#FFF2F5FA"
+                                BorderBrush="{StaticResource BrushBorder}" BorderThickness="1"
+                                ClipToBounds="True" Margin="0,0,12,0">
+                            <Image Source="{Binding PetImagePreview}" Stretch="Uniform" Margin="6" />
+                        </Border>
+                        <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding PetImagePreviewText}" FontSize="12.5"
+                                       Foreground="{StaticResource BrushTextPrimary}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                            <TextBlock Text="支持 PNG / JPG / GIF（透明 PNG 效果最佳）"
+                                       Style="{StaticResource HintTextStyle}" Margin="0,4,0,0" />
+                            <WrapPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Content="选择图片…" Click="OnChoosePetImage"
+                                        Style="{StaticResource PrimaryButtonStyle}" MinWidth="90" />
+                                <Button Content="恢复默认" Command="{Binding ResetPetImageCommand}"
+                                        Style="{StaticResource PrimaryButtonStyle}" MinWidth="80" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </WrapPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- ============ 存储 ============ -->
+            <TabItem Header="存储">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                    <StackPanel Margin="6">
+                        <TextBlock Text="汇报目录（留空使用默认：文档\WorkAlarmClock\Reports）"
+                                   Style="{StaticResource SectionTitleStyle}" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <TextBox Text="{Binding Draft.ReportDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="280" VerticalAlignment="Center" />
+                            <Button Content="浏览" Margin="8,0,0,0" Padding="12,2"
+                                    Command="{Binding BrowseDirectoryCommand}" Cursor="Hand" />
+                        </WrapPanel>
+
+                        <TextBlock Text="日报页脚（可选单行文本；留空则不显示，渲染在日报末尾）"
+                                   Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" />
+                        <TextBox Text="{Binding Draft.ReportFooter, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="320" Margin="0,0,0,6" />
+                        <Button Content="清空页脚" Command="{Binding ResetFooterCommand}"
+                                Padding="12,2" HorizontalAlignment="Left" Cursor="Hand" />
+
+                        <CheckBox Content="开机自启动（写入注册表 HKCU\…\Run）"
+                                  IsChecked="{Binding Draft.AutoStart}" Margin="0,16,0,0" />
+
+                        <TextBlock Text="截图保存目录（留空使用默认：图片\WorkAlarmClock\Screenshots）"
+                                   Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" Margin="0,18,0,6" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBox Text="{Binding Draft.ScreenshotDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="280" VerticalAlignment="Center" />
+                            <Button Content="浏览" Margin="8,0,0,0" Padding="12,2"
+                                    Command="{Binding BrowseScreenshotDirectoryCommand}" Cursor="Hand" />
+                        </WrapPanel>
+                        <CheckBox Content="截图后自动复制到剪贴板" IsChecked="{Binding Draft.ScreenshotCopyToClipboard}" />
+                        <TextBlock Text="提示：按下截图热键（默认 Ctrl+Alt+A）后拖拽选择区域，松开鼠标即完成；Esc 或右键取消。"
+                                   Style="{StaticResource HintTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                        <TextBlock Text="日报模板（占位符：{date} {todayWork} {tomorrowPlan} {risks} {work} {rest}）"
+                                   Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" Margin="0,18,0,6" />
+                        <TextBox Text="{Binding Draft.ReportTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True" TextWrapping="Wrap" Height="132"
+                                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="恢复默认模板" Command="{Binding ResetTemplateCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="112" />
+                            <TextBlock Text="留空即使用内置模板" Style="{StaticResource HintTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </WrapPanel>
+
+                        <TextBlock Text="输出格式" Style="{StaticResource SectionTitleStyle}" Margin="0,16,0,6" />
+                        <ComboBox Width="160" HorizontalAlignment="Left"
+                                  ItemsSource="{Binding ReportFormatOptions}"
+                                  DisplayMemberPath="Text"
+                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding Draft.ReportFileFormat}" />
+
+                        <TextBlock Text="数据备份" Style="{StaticResource SectionTitleStyle}" Margin="0,18,0,6" />
+                        <CheckBox Content="每天首次启动自动备份数据库" IsChecked="{Binding Draft.BackupEnabled}" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <TextBlock Text="保留" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.BackupKeepDays, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="72" Margin="6,0" />
+                            <TextBlock Text="天，超期自动清理" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <Button Content="立即备份" Command="{Binding BackupNowCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="88" Margin="14,0,0,0" />
+                        </WrapPanel>
+
+                        <TextBlock Text="数据导出" Style="{StaticResource SectionTitleStyle}" Margin="0,18,0,6" />
+                        <WrapPanel Orientation="Horizontal">
+                            <Button Content="导出 CSV" Command="{Binding ExportCsvCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="96" />
+                            <TextBlock Text="导出工时、事项（含标签）、日报清单三张表，Excel 可直接打开"
+                                       Style="{StaticResource HintTextStyle}" VerticalAlignment="Center"
+                                       Margin="10,0,0,0" TextWrapping="Wrap" MaxWidth="300" />
+                        </WrapPanel>
+
+                        <TextBlock Text="工具与网络" Style="{StaticResource SectionTitleStyle}" Margin="0,18,0,6" />
+                        <CheckBox Content="记录剪贴板历史" IsChecked="{Binding Draft.ClipboardHistoryEnabled}" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <TextBlock Text="保留" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.ClipboardHistoryMax, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="52" Margin="6,0" />
+                            <TextBlock Text="条" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                        </WrapPanel>
+                        <CheckBox Content="网络状态监测（主面板显示在线状态）" IsChecked="{Binding Draft.NetworkMonitorEnabled}"
+                                  Margin="0,12,0,0" />
+                        <CheckBox Content="天气显示（Open-Meteo 免费接口）" IsChecked="{Binding Draft.WeatherEnabled}"
+                                  Margin="0,10,0,0" />
+                        <CheckBox Content="启动时按 IP 自动定位城市（IP 可能不准）"
+                                  IsChecked="{Binding Draft.WeatherAutoLocate}"
+                                  IsEnabled="{Binding CanAutoLocate}"
+                                  Margin="0,6,0,0" />
+                        <CheckBox Content="手动指定地区（不再用 IP 定位）"
+                                  IsChecked="{Binding UseManualLocation}"
+                                  Margin="0,6,0,0" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <ComboBox ItemsSource="{Binding CityOptions}"
+                                      SelectedItem="{Binding SelectedCity}"
+                                      IsEnabled="{Binding UseManualLocation}"
+                                      DisplayMemberPath="Name"
+                                      Width="150" VerticalContentAlignment="Center" />
+                            <Button Content="按 IP 重新定位" Command="{Binding RelocateCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="106"
+                                    Margin="8,0,0,0" />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding WeatherLocationText}" Style="{StaticResource HintTextStyle}"
+                                   Margin="0,6,0,0" />
+                        <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <TextBlock Text="自定义坐标" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <TextBox Text="{Binding Draft.WeatherLatitude, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="70" Margin="6,0" />
+                            <TextBox Text="{Binding Draft.WeatherLongitude, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="70" Margin="0,0,6,0" />
+                            <Button Content="应用" Command="{Binding ApplyCoordinatesCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="54" />
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ 热键 ============ -->
+            <TabItem Header="热键">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                    <StackPanel Margin="6">
+                        <TextBlock Text="全局热键（点击右侧按钮后按下组合键；同组内不可重复）"
+                                   Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="开始工作" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyStartWork}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="开始休息" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyStartRest}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="结束当天" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyEndDay}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="生成工作汇报" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyGenerateReport}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="桌宠 / 灵动岛切换" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyTogglePet}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="显示 / 隐藏桌宠" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyToggleVisible}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="区域截图" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyScreenshot}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="开始/停止专注" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyFocus}" Margin="0,2" />
+                        </Grid>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="120" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="变量名生成器" VerticalAlignment="Center" Style="{StaticResource HintTextStyle}" />
+                            <views:HotkeyEditor Grid.Column="1" Combo="{Binding HotkeyVariableNameGenerator}" Margin="0,2" />
+                        </Grid>
+                        <TextBlock Text="提示：热键在任意前台窗口生效；退出时自动卸载。"
+                                   Style="{StaticResource HintTextStyle}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- 底部按钮 -->
+        <WrapPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="保存" Command="{Binding SaveCommand}" Style="{StaticResource AccentButtonStyle}"
+                    MinWidth="96" />
+            <Button Content="取消" Command="{Binding CancelCommand}" Style="{StaticResource PrimaryButtonStyle}"
+                    Margin="8,0,0,0" MinWidth="96" />
+        </WrapPanel>
+    </Grid>
+</UserControl>

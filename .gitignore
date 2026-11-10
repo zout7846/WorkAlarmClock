@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local agent notes, test runs and generated release binaries
+.tmp/
+.workbuddy/
+dist/
+pubilc/

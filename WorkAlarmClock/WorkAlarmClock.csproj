@@ -9,6 +9,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>WorkAlarmClock</RootNamespace>
     <AssemblyName>WorkAlarmClock</AssemblyName>
+    <Version>3.0.0</Version>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <FileVersion>3.0.0.0</FileVersion>
     <NeutralLanguage>zh-CN</NeutralLanguage>
     <ApplicationIcon>Assets\iconfinder-info-4341298_120528.ico</ApplicationIcon>
   </PropertyGroup>
@@ -21,12 +24,11 @@
     <Using Remove="System.Drawing" />
   </ItemGroup>
 
-  <!-- 仅允许两个微软官方轻量包（增量 R-29）：SQLite 持久化与正式 IOC 容器。
-       禁止任何社区第三方包（不引入 CommunityToolkit.Mvvm / MahApps / Hardcodet.NotifyIcon 等）。
-       自写 MVVM 基类、P/Invoke 锁屏/空闲检测、WinForms NotifyIcon 维持不变。 -->
+  <!-- 基础依赖仅使用微软官方轻量包；ZXing.Net 为二维码/条码编解码功能的专项依赖。 -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
   </ItemGroup>
 
   <!-- 运行时资源：桌宠立绘（R-58）+ 托盘图标正常/灰度两版（R-59）。 -->

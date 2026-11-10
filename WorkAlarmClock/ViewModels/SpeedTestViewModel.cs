@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using WorkAlarmClock.Infrastructure;
 using WorkAlarmClock.Services;
@@ -10,6 +10,9 @@ namespace WorkAlarmClock.ViewModels;
 /// </summary>
 public sealed class SpeedTestViewModel : ObservableObject
 {
+    public System.Collections.ObjectModel.ObservableCollection<double> DownloadTrend { get; } = new();
+    public System.Collections.ObjectModel.ObservableCollection<double> UploadTrend { get; } = new();
+    public System.Collections.ObjectModel.ObservableCollection<string> TrendLabels { get; } = new();
     private string _latencyText = "--";
     private string _downloadText = "--";
     private string _uploadText = "--";
@@ -137,6 +140,7 @@ public sealed class SpeedTestViewModel : ObservableObject
         LatencyText = "--";
         DownloadText = "--";
         UploadText = "--";
+        DownloadTrend.Clear(); UploadTrend.Clear(); TrendLabels.Clear();
         await AppServices.SpeedTest.RunAsync();
     }
 
@@ -150,6 +154,9 @@ public sealed class SpeedTestViewModel : ObservableObject
         IsTesting = speed.IsTesting;
         StageText = speed.StageText;
 
+        LatencyText = "--";
+        DownloadText = "--";
+        UploadText = "--";
         if (speed.LatencyMs > 0)
         {
             LatencyText = speed.LatencyMs.ToString(CultureInfo.InvariantCulture) + " ms";
@@ -162,10 +169,18 @@ public sealed class SpeedTestViewModel : ObservableObject
 
         DownloadMbps = speed.DownloadMbps;
         UploadMbps = speed.UploadMbps;
+        if (speed.Phase is SpeedPhase.Download or SpeedPhase.Upload)
+        {
+            DownloadTrend.Add(Math.Max(0, speed.DownloadMbps));
+            UploadTrend.Add(Math.Max(0, speed.UploadMbps));
+            TrendLabels.Add(DateTime.Now.ToString("HH:mm:ss"));
+            while (DownloadTrend.Count > 90) { DownloadTrend.RemoveAt(0); UploadTrend.RemoveAt(0); TrendLabels.RemoveAt(0); }
+        }
         NodeText = "节点：" + speed.NodeName;
 
         // 单指针随阶段切换：上传阶段显示上传速率（绿），其余显示下载速率（蓝）
-        bool uploading = speed.Phase == SpeedPhase.Upload;
+        bool uploading = speed.Phase == SpeedPhase.Upload ||
+            (speed.Phase is SpeedPhase.Done or SpeedPhase.Failed && GaugeLabel == "上传");
         GaugeLabel = uploading ? "上传" : "下载";
         GaugeBrush = uploading
             ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x32, 0xC4, 0x8D))

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -72,6 +72,7 @@ public partial class ScreenshotAnnotationWindow : Window
         ArrowTool.IsChecked = ReferenceEquals(button, ArrowTool);
         PenTool.IsChecked = ReferenceEquals(button, PenTool);
         TextTool.IsChecked = ReferenceEquals(button, TextTool);
+        MosaicTool.IsChecked = ReferenceEquals(button, MosaicTool);
         _tool = button.Tag as string ?? "Rect";
     }
 
@@ -177,6 +178,32 @@ public partial class ScreenshotAnnotationWindow : Window
 
     private void OnCanvasMouseUp(object sender, MouseButtonEventArgs e)
     {
+        if (_drawing && _tool == "Mosaic" && _currentShape is Rectangle selection)
+        {
+            ShapeLayer.Children.Remove(selection);
+            int x = (int)Math.Clamp(Canvas.GetLeft(selection), 0, _image.PixelWidth);
+            int y = (int)Math.Clamp(Canvas.GetTop(selection), 0, _image.PixelHeight);
+            int width = (int)Math.Min(selection.Width, _image.PixelWidth - x);
+            int height = (int)Math.Min(selection.Height, _image.PixelHeight - y);
+            if (width > 0 && height > 0)
+            {
+                // Flatten all existing annotations before pixelating, including text.
+                var crop = new CroppedBitmap(Compose(), new Int32Rect(x, y, width, height));
+                int smallWidth = Math.Max(1, width / 14);
+                int smallHeight = Math.Max(1, height / 14);
+                var visual = new DrawingVisual();
+                using (var dc = visual.RenderOpen()) dc.DrawImage(crop, new Rect(0, 0, smallWidth, smallHeight));
+                var pixels = new RenderTargetBitmap(smallWidth, smallHeight, 96, 96, PixelFormats.Pbgra32);
+                pixels.Render(visual);
+                pixels.Freeze();
+                var mosaic = new Image { Source = pixels, Width = width, Height = height, Stretch = Stretch.Fill, IsHitTestVisible = false };
+                RenderOptions.SetBitmapScalingMode(mosaic, BitmapScalingMode.NearestNeighbor);
+                Canvas.SetLeft(mosaic, x);
+                Canvas.SetTop(mosaic, y);
+                ShapeLayer.Children.Add(mosaic);
+                StatusText.Text = "已添加马赛克，可撤销；复制与保存将包含马赛克。";
+            }
+        }
         _drawing = false;
         _currentShape = null;
         _currentPen = null;

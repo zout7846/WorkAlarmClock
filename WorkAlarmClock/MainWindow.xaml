@@ -1,32 +1,29 @@
-﻿<Window x:Class="WorkAlarmClock.MainWindow"
-        x:Name="MainRoot"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="WorkAlarmClock 工作日记"
-        Width="440" Height="790"
-        MinWidth="400" MinHeight="560"
-        WindowStartupLocation="CenterScreen"
-        Background="{StaticResource BrushPanelGradient}"
-        FontFamily="Microsoft YaHei UI"
-        Closing="OnWindowClosing">
-    <Grid Margin="14,14,14,12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+<Window x:Class="WorkAlarmClock.MainWindow" x:Name="MainRoot"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:views="clr-namespace:WorkAlarmClock.Views"
+ Title="WorkAlarmClock 工作台" Width="1060" Height="740" MinWidth="900" MinHeight="620"
+ WindowStartupLocation="CenterScreen" Background="#F2F7FD" FontFamily="Microsoft YaHei UI" Closing="OnWindowClosing">
+ <Window.Resources>
+  <Style x:Key="NavigationItem" TargetType="ListBoxItem">
+   <Setter Property="Padding" Value="14,11"/><Setter Property="Margin" Value="0,4"/><Setter Property="Foreground" Value="#405C7B"/><Setter Property="FontSize" Value="14"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="Surface" Background="Transparent" CornerRadius="10" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#286FC4"/><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Trigger><MultiTrigger><MultiTrigger.Conditions><Condition Property="IsMouseOver" Value="True"/><Condition Property="IsSelected" Value="False"/></MultiTrigger.Conditions><Setter TargetName="Surface" Property="Background" Value="#DDEEFF"/></MultiTrigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
 
-        <!-- ============ 顶部渐变头卡：状态 + 时钟 + 快捷图标 ============ -->
-        <Border Grid.Row="0" CornerRadius="16" Background="{StaticResource BrushHeaderGradient}" Padding="16,14">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="22" ShadowDepth="4" Direction="270" Opacity="0.26" Color="#FF2158D6" />
-            </Border.Effect>
+ </Window.Resources>
+ <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="184"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+  <Border Background="#F8FBFF" BorderBrush="#DDEAF7" BorderThickness="0,0,1,0">
+   <DockPanel Margin="12,18,12,14">
+    <StackPanel DockPanel.Dock="Top" Margin="10,0,0,18"><Border Background="#DCEEFF" CornerRadius="12" Width="44" Height="44" HorizontalAlignment="Left"><TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="#387AC2" VerticalAlignment="Center" HorizontalAlignment="Center"/></Border><TextBlock Text="工作日记" FontSize="22" FontWeight="Bold" Foreground="#23476E" Margin="0,14,0,4"/><TextBlock Text="WORK ALARM CLOCK" FontSize="10" Foreground="#7D96AF"/></StackPanel>
+    <StackPanel DockPanel.Dock="Bottom"><Button Content="显示 / 隐藏桌宠" Command="{Binding TogglePetCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0"/><TextBlock Text="让工作有序，让时间清晰" Foreground="#8AA0B8" FontSize="11" Margin="8,20,0,0"/></StackPanel>
+    <ListBox SelectedIndex="{Binding SelectedIndex, ElementName=WorkspaceTabs, Mode=TwoWay}" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource NavigationItem}"><ListBoxItem Content="工作概览"/><ListBoxItem Content="今日事项"/><ListBoxItem Content="效率工具"/><ListBoxItem Content="工作汇报"/><ListBoxItem Content="设置"/></ListBox>
+   </DockPanel>
+  </Border>
+  <Grid Grid.Column="1"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Border Background="White" BorderBrush="#DDEAF7" BorderThickness="0,0,0,1" Padding="20,12"><DockPanel><Button DockPanel.Dock="Right" Content="效率工具 ↗" Click="OpenTools" Style="{StaticResource PrimaryButtonStyle}" Margin="16,0,0,0"/><TextBlock Text="{Binding SelectedItem.Header, ElementName=WorkspaceTabs}" FontSize="18" FontWeight="SemiBold" Foreground="#23476E"/><Border Background="#EDF6FF" CornerRadius="10" Padding="12,4" HorizontalAlignment="Right"><TextBlock Text="{Binding StateText}" Foreground="#387AC2" FontSize="12"/></Border></DockPanel></Border>
+   <DockPanel Grid.Row="1"><views:NotificationBar DockPanel.Dock="Top" Margin="18,8,18,0"/><TabControl x:Name="WorkspaceTabs" SelectionChanged="OnPageChanged" SelectedIndex="0" Background="Transparent" BorderThickness="0" Padding="14,12" Margin="4,6,4,4"><TabControl.Template><ControlTemplate TargetType="TabControl"><ContentPresenter ContentSource="SelectedContent" Margin="{TemplateBinding Padding}"/></ControlTemplate></TabControl.Template>
+<TabItem Header="工作概览"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>        <!-- ============ 顶部渐变头卡：状态 + 时钟 + 快捷图标 ============ -->
+        <Border Grid.Row="0" CornerRadius="16" Background="#E2F0FF" Padding="16,14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -55,9 +52,9 @@
                                     </Style>
                                 </Ellipse.Style>
                             </Ellipse>
-                            <TextBlock Text="{Binding StateText}" Foreground="#FFFFFFFF" FontSize="12"
+                            <TextBlock Text="{Binding StateText}" Foreground="#23476E" FontSize="12"
                                        FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center" />
-                            <TextBlock Text="已结束当天" Foreground="#CCFFFFFF" FontSize="10.5" Margin="6,0,0,0"
+                            <TextBlock Text="已结束当天" Foreground="#527597" FontSize="10.5" Margin="6,0,0,0"
                                        VerticalAlignment="Center">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -73,24 +70,24 @@
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Text="{Binding NowText}" Foreground="#FFFFFFFF" FontSize="34" FontWeight="Bold"
+                    <TextBlock Text="{Binding NowText}" Foreground="#23476E" FontSize="34" FontWeight="Bold"
                                Margin="0,8,0,0" FontFamily="Segoe UI Semibold" />
-                    <TextBlock Text="今日累计工作 / 休息见下方卡片" Foreground="#B3FFFFFF" FontSize="11" Margin="0,2,0,0" />
+                    <TextBlock Text="专注当下，记录每一份进展" Foreground="#527597" FontSize="11" Margin="0,2,0,0" />
                 </StackPanel>
 
                 <!-- 快捷图标 -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                     <Button Style="{StaticResource IconButtonStyle}" Content="&#xE81C;"
-                            Foreground="#FFFFFFFF" ToolTip="历史日报"
+                            Foreground="#23476E" ToolTip="历史日报"
                             Command="{Binding OpenHistoryCommand}" />
                     <Button Style="{StaticResource IconButtonStyle}" Content="&#xE722;"
-                            Foreground="#FFFFFFFF" ToolTip="区域截图（Ctrl+Alt+A）"
+                            Foreground="#23476E" ToolTip="区域截图（Ctrl+Alt+A）"
                             Command="{Binding ScreenshotCommand}" />
                     <Button Style="{StaticResource IconButtonStyle}" Content="&#xE9D9;"
-                            Foreground="#FFFFFFFF" ToolTip="工作统计"
+                            Foreground="#23476E" ToolTip="工作统计"
                             Command="{Binding OpenStatisticsCommand}" />
                     <Button Style="{StaticResource IconButtonStyle}" Content="&#xE713;"
-                            Foreground="#FFFFFFFF" ToolTip="设置"
+                            Foreground="#23476E" ToolTip="设置"
                             Command="{Binding OpenSettingsCommand}" />
                 </StackPanel>
             </Grid>
@@ -131,11 +128,11 @@
         <!-- ============ 操作行 ============ -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
             <Button Content="开始工作" Command="{Binding StartWorkCommand}"
-                    Style="{StaticResource AccentButtonStyle}" Height="38" MinWidth="104" />
+                    Style="{StaticResource AccentButtonStyle}" MinWidth="104" />
             <Button Content="开始休息" Command="{Binding StartRestCommand}"
-                    Style="{StaticResource PrimaryButtonStyle}" Height="38" MinWidth="96" />
+                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="96" />
             <Button Content="结束当天" Command="{Binding EndDayCommand}"
-                    Style="{StaticResource PrimaryButtonStyle}" Height="38" MinWidth="96" Margin="0" />
+                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="96" Margin="0" />
         </StackPanel>
 
         <!-- ============ 番茄钟 ============ -->
@@ -171,9 +168,9 @@
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="跳过" Command="{Binding FocusSkipCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}" MinWidth="60" Height="30" Margin="0,0,6,0" />
+                            Style="{StaticResource PrimaryButtonStyle}" MinWidth="60" Margin="0,0,6,0" />
                     <Button Content="{Binding FocusButtonText}" Command="{Binding FocusToggleCommand}"
-                            MinWidth="88" Height="30" Margin="0">
+                            MinWidth="88" Margin="0">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
                                 <Setter Property="Background" Value="{StaticResource BrushAccentGradient}" />
@@ -188,69 +185,6 @@
                 </StackPanel>
             </Grid>
         </Border>
-
-        <!-- ============ 工具磁贴行 ============ -->
-        <UniformGrid Grid.Row="4" Columns="4" Margin="0,12,0,0">
-            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenWeatherCommand}" Margin="0,0,6,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding WeatherTileGlyph}" FontFamily="Segoe MDL2 Assets" FontSize="20"
-                               Foreground="{StaticResource BrushAccent}" VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding WeatherTileText}" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource BrushTextPrimary}" />
-                        <TextBlock Text="{Binding WeatherTileSub}" Style="{StaticResource CaptionStyle}" />
-                    </StackPanel>
-                </Grid>
-            </Button>
-            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenCountdownCommand}" Margin="0,0,6,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="18"
-                               Foreground="{StaticResource BrushStateLunch}" VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding CountdownTileText}" FontSize="14" FontWeight="SemiBold"
-                                   FontFamily="Consolas" Foreground="{StaticResource BrushTextPrimary}" />
-                        <TextBlock Text="倒计时" Style="{StaticResource CaptionStyle}" />
-                    </StackPanel>
-                </Grid>
-            </Button>
-            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenClipboardCommand}" Margin="0,0,6,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="18"
-                               Foreground="#FF6C5CE0" VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding ClipboardTileText}" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{StaticResource BrushTextPrimary}" />
-                        <TextBlock Text="剪贴板" Style="{StaticResource CaptionStyle}" />
-                    </StackPanel>
-                </Grid>
-            </Button>
-            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenSpeedTestCommand}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Ellipse Width="10" Height="10" Fill="{Binding NetworkTileColor}" VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding NetworkTileText}" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{StaticResource BrushTextPrimary}" />
-                        <TextBlock Text="{Binding NetworkTileSub}" Style="{StaticResource CaptionStyle}" />
-                    </StackPanel>
-                </Grid>
-            </Button>
-        </UniformGrid>
 
         <!-- ============ 本周统计（可折叠） ============ -->
         <Border Grid.Row="5" Margin="0,12,0,0" VerticalAlignment="Top">
@@ -279,8 +213,9 @@
             </StackPanel>
         </Border>
 
-        <!-- ============ 今日事项 ============ -->
-        <Grid Grid.Row="6" Margin="0,14,0,0">
+<Border Style="{StaticResource CardStyle}" Margin="0,10,0,0" Padding="14"><StackPanel><TextBlock Text="常用工具" FontSize="15" FontWeight="SemiBold" Foreground="#23476E"/><WrapPanel Margin="0,10,0,0"><Button Content="截图 / 马赛克" Command="{Binding ScreenshotCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="计算器" Click="OpenTools" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="天气" Command="{Binding OpenWeatherCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="倒计时" Command="{Binding OpenCountdownCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="记录事项" Click="OpenTasks" Style="{StaticResource AccentButtonStyle}"/></WrapPanel></StackPanel></Border></StackPanel></ScrollViewer></TabItem>
+<TabItem Header="今日事项"><Grid><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>        <!-- ============ 今日事项 ============ -->
+        <Grid Grid.Row="0" Margin="0,14,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -355,7 +290,7 @@
                                     <TextBlock Text="{Binding Tag}" FontSize="10.5" Foreground="#FF4B7A3F" />
                                 </Border>
                                 <TextBlock Grid.Column="2" Text="{Binding Text}" FontSize="13"
-                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                           TextWrapping="Wrap" VerticalAlignment="Center"
                                            Margin="9,0,8,0" Foreground="{StaticResource BrushTextPrimary}" />
                                 <Button Grid.Column="3" Style="{StaticResource IconButtonStyle}"
                                         Content="&#xE74D;" Width="26" Height="26" FontSize="12"
@@ -370,7 +305,7 @@
         </Grid>
 
         <!-- ============ 输入行 ============ -->
-        <Border Grid.Row="7" Style="{StaticResource CardStyle}" Padding="10,8" Margin="0,10,0,0">
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="10,8" Margin="0,10,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -378,7 +313,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <ComboBox ItemsSource="{Binding TagOptions}" SelectedItem="{Binding SelectedTag}"
-                          DisplayMemberPath="Text" Width="78" Height="30" Margin="0,0,8,0"
+                          DisplayMemberPath="Text" Width="78" Margin="0,0,8,0"
                           VerticalAlignment="Center" FontSize="11.5" />
                 <TextBox Grid.Column="1" Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
                          BorderThickness="0" Background="Transparent" FontSize="13"
@@ -403,20 +338,108 @@
                     </TextBlock.Style>
                 </TextBlock>
                 <Button Grid.Column="2" Content="添加" Command="{Binding AddTaskCommand}"
-                        Style="{StaticResource AccentButtonStyle}" MinWidth="62" Height="32" Margin="8,0,0,0" />
+                        Style="{StaticResource AccentButtonStyle}" MinWidth="62" Margin="8,0,0,0" />
             </Grid>
         </Border>
 
-        <!-- ============ 底部动作 ============ -->
-        <Grid Grid.Row="8" Margin="0,12,0,0">
-            <Button Content="生成工作汇报" Command="{Binding GenerateReportCommand}"
-                    Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" MinWidth="116" Margin="0" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="日报预览" Command="{Binding OpenPreviewCommand}"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-                <Button Content="隐藏桌宠" Command="{Binding TogglePetCommand}"
-                        Style="{StaticResource PrimaryButtonStyle}" Margin="0" />
-            </StackPanel>
-        </Grid>
-    </Grid>
+</Grid></TabItem>
+<TabItem Header="效率工具"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="效率工具" FontSize="24" FontWeight="SemiBold" Foreground="#23476E"/><TextBlock Text="天气、倒计时、剪贴板与网络状态，随时取用。" Foreground="#66758A" Margin="0,8,0,20"/>        <!-- ============ 工具磁贴行 ============ -->
+        <UniformGrid Grid.Row="4" Columns="2" Margin="0,12,0,0">
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenWeatherCommand}" Margin="0,0,10,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding WeatherTileGlyph}" FontFamily="Segoe MDL2 Assets" FontSize="20"
+                               Foreground="{StaticResource BrushAccent}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding WeatherTileText}" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="{Binding WeatherTileSub}" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenCountdownCommand}" Margin="0,0,10,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                               Foreground="{StaticResource BrushStateLunch}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CountdownTileText}" FontSize="14" FontWeight="SemiBold"
+                                   FontFamily="Consolas" Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="倒计时" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenClipboardCommand}" Margin="0,0,10,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                               Foreground="#FF6C5CE0" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ClipboardTileText}" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="剪贴板" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenSpeedTestCommand}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="10" Height="10" Fill="{Binding NetworkTileColor}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding NetworkTileText}" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}" />
+                        <TextBlock Text="{Binding NetworkTileSub}" Style="{StaticResource CaptionStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenCalculatorCommand}" Margin="0,0,10,8">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE8EF;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#247DB5" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center"><TextBlock Text="计算器" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}"/><TextBlock Text="四则运算" Style="{StaticResource CaptionStyle}"/></StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenRadixConverterCommand}">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#C06A31" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center"><TextBlock Text="进制转换" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}"/><TextBlock Text="二 / 八 / 十 / 十六进制" Style="{StaticResource CaptionStyle}"/></StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenCodeToolCommand}" Margin="0,0,10,8">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#D34F64" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center"><TextBlock Text="二维码 / 条码" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}"/><TextBlock Text="生成、识别与导出" Style="{StaticResource CaptionStyle}"/></StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenVariableNameGeneratorCommand}" Margin="0,0,10,8">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE8D2;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#2A9D8F" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center"><TextBlock Text="变量名生成器" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}"/><TextBlock Text="中英翻译 · 命名格式" Style="{StaticResource CaptionStyle}"/></StackPanel>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TileButtonStyle}" Command="{Binding OpenImageConverterCommand}">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE91B;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#C06A31" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center"><TextBlock Text="图片转换器" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}"/><TextBlock Text="PNG / JPG / 多尺寸 ICO" Style="{StaticResource CaptionStyle}"/></StackPanel>
+                </Grid>
+            </Button>
+        </UniformGrid>
+
+<WrapPanel Margin="0,20,0,0"><Button Content="区域截图" Command="{Binding ScreenshotCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="显示 / 隐藏桌宠" Command="{Binding TogglePetCommand}" Style="{StaticResource PrimaryButtonStyle}"/></WrapPanel></StackPanel></ScrollViewer></TabItem>
+<TabItem Header="工作汇报"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="工作汇报" FontSize="24" FontWeight="SemiBold" Foreground="#23476E"/><TextBlock Text="将今日事项整理为汇报，回顾工作进展。" Foreground="#66758A" Margin="0,8,0,24"/><Border Style="{StaticResource CardStyle}" Padding="24"><StackPanel><TextBlock Text="今天的每一步，都值得记录" FontSize="20" Foreground="#23476E"/><TextBlock Text="生成汇报前，可先在今日事项中补充记录。" Foreground="#66758A" Margin="0,10,0,20"/><WrapPanel><Button Content="生成工作汇报" Command="{Binding GenerateReportCommand}" Style="{StaticResource AccentButtonStyle}"/><Button Content="日报预览" Command="{Binding OpenPreviewCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="历史日报" Command="{Binding OpenHistoryCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="工作统计" Command="{Binding OpenStatisticsCommand}" Style="{StaticResource PrimaryButtonStyle}"/></WrapPanel></StackPanel></Border></StackPanel></ScrollViewer></TabItem>
+<TabItem Header="设置"><ContentControl x:Name="SettingsHost"/></TabItem>
+   </TabControl></DockPanel>
+  </Grid>
+ </Grid>
 </Window>

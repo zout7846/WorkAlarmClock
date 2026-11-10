@@ -1,4 +1,4 @@
-using System;
+﻿//using System;
 
 namespace WorkAlarmClock.Models;
 
@@ -169,6 +169,9 @@ public sealed class AppSettings
     /// <summary>启动时按 IP 自动定位（失败时回退到手动坐标）。</summary>
     public bool WeatherAutoLocate { get; set; } = true;
 
+    /// <summary>手动指定地区：为 true 时忽略 IP 定位，使用下方城市与经纬度。</summary>
+    public bool WeatherManualLocation { get; set; }
+
     /// <summary>天气城市名（仅展示；自动定位会覆盖）。</summary>
     public string WeatherCity { get; set; } = string.Empty;
 
@@ -177,6 +180,9 @@ public sealed class AppSettings
 
     /// <summary>天气经度。</summary>
     public double WeatherLongitude { get; set; } = 116.4074;
+
+    /// <summary>上次成功按 IP 定位的时间（用于避免启动时重复联网定位）。</summary>
+    public DateTimeOffset? WeatherLocatedAt { get; set; }
 
     /// <summary>桌宠亲密度（点击互动累积）。</summary>
     public int PetIntimacy { get; set; }
@@ -270,9 +276,11 @@ public sealed class AppSettings
             NetworkMonitorEnabled = NetworkMonitorEnabled,
             WeatherEnabled = WeatherEnabled,
             WeatherAutoLocate = WeatherAutoLocate,
+            WeatherManualLocation = WeatherManualLocation,
             WeatherCity = WeatherCity,
             WeatherLatitude = WeatherLatitude,
             WeatherLongitude = WeatherLongitude,
+            WeatherLocatedAt = WeatherLocatedAt,
             PetIntimacy = PetIntimacy,
             ScreenshotDirectory = ScreenshotDirectory,
             ScreenshotCopyToClipboard = ScreenshotCopyToClipboard,
@@ -285,7 +293,8 @@ public sealed class AppSettings
                 TogglePet = Hotkeys.TogglePet,
                 Screenshot = Hotkeys.Screenshot,
                 Focus = Hotkeys.Focus,
-                ToggleVisible = Hotkeys.ToggleVisible
+                ToggleVisible = Hotkeys.ToggleVisible,
+                VariableNameGenerator = Hotkeys.VariableNameGenerator
             },
             PetLeft = PetLeft,
             PetTop = PetTop,

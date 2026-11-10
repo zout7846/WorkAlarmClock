@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using WorkAlarmClock.Models;
 
@@ -653,6 +653,19 @@ public interface INetworkMonitor
     void Stop();
 }
 
+/// <summary>触发 IP 自动定位的来源。</summary>
+public enum WeatherLocateTrigger
+{
+    /// <summary>应用启动，允许使用定位缓存。</summary>
+    Startup,
+
+    /// <summary>5 分钟定时周期，必须真实联网定位。</summary>
+    Periodic,
+
+    /// <summary>用户主动点「按 IP 重新定位」/「自动定位」，尊重用户显式意图。</summary>
+    Manual
+}
+
 /// <summary>
 /// 天气服务：Open-Meteo 免费接口（无需 Key），按设置的经纬度取当前天气与三日预报。
 /// </summary>
@@ -660,6 +673,7 @@ public interface IWeatherService
 {
     /// <summary>最近一次成功的天气快照；从未成功则为 null。</summary>
     WeatherSnapshot? Current { get; }
+    string StatusText { get; }
 
     /// <summary>数据更新事件（成功后触发）。</summary>
     event EventHandler? Updated;
@@ -668,9 +682,9 @@ public interface IWeatherService
     Task RefreshAsync();
 
     /// <summary>按 IP 自动定位（更新城市/经纬度）并刷新天气。</summary>
-    Task LocateAsync();
+    Task LocateAsync(WeatherLocateTrigger trigger = WeatherLocateTrigger.Startup);
 
-    /// <summary>启动定时刷新（30 分钟一次）。</summary>
+    /// <summary>启动定时刷新（5 分钟一次，每次走完整定位链路）。</summary>
     void Start();
 
     /// <summary>停止定时刷新。</summary>
@@ -721,7 +735,13 @@ public sealed record WeatherSnapshot(
     string Description,
     string IconGlyph,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<DailyForecast> Days);
+    IReadOnlyList<DailyForecast> Days)
+{
+    public IReadOnlyList<HourlyForecast> Hours { get; init; } = Array.Empty<HourlyForecast>();
+    public DateTimeOffset? ObservedAt { get; init; }
+}
+
+public sealed record HourlyForecast(DateTimeOffset Time, double Temperature, double? Probability, double? Precipitation);
 
 /// <summary>单日预报。</summary>
 /// <param name="Date">日期。</param>
@@ -770,6 +790,9 @@ public interface IHotkeyActions
 
     /// <summary>显示/隐藏桌宠（灵动岛）。</summary>
     void ToggleVisible();
+
+    /// <summary>唤起变量名生成器。</summary>
+    void OpenVariableNameGenerator();
 }
 
 /// <summary>

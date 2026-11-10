@@ -32,7 +32,10 @@ public enum HotkeyAction
     Focus,
 
     /// <summary>显示/隐藏桌宠（灵动岛）。</summary>
-    ToggleVisible
+    ToggleVisible,
+
+    /// <summary>唤起变量名生成器。</summary>
+    VariableNameGenerator
 }
 
 /// <summary>
@@ -155,6 +158,9 @@ public sealed class HotkeySettings
     /// <summary>显示/隐藏桌宠（默认 Ctrl+Alt+H）。</summary>
     public HotkeyCombo ToggleVisible { get; set; } = new HotkeyCombo(0x48, true, true, false);
 
+    /// <summary>唤起变量名生成器（默认 Ctrl+Alt+N）。</summary>
+    public HotkeyCombo VariableNameGenerator { get; set; } = new HotkeyCombo(0x4E, true, true, false);
+
     /// <summary>按动作枚举取出对应组合。</summary>
     /// <param name="action">动作。</param>
     /// <returns>组合键。</returns>
@@ -167,6 +173,7 @@ public sealed class HotkeySettings
         HotkeyAction.Screenshot => Screenshot,
         HotkeyAction.Focus => Focus,
         HotkeyAction.ToggleVisible => ToggleVisible,
+        HotkeyAction.VariableNameGenerator => VariableNameGenerator,
         _ => TogglePet
     };
 
@@ -198,6 +205,9 @@ public sealed class HotkeySettings
             case HotkeyAction.ToggleVisible:
                 ToggleVisible = combo;
                 break;
+            case HotkeyAction.VariableNameGenerator:
+                VariableNameGenerator = combo;
+                break;
             default:
                 TogglePet = combo;
                 break;
@@ -216,5 +226,6 @@ public sealed class HotkeySettings
         yield return (HotkeyAction.Screenshot, Screenshot);
         yield return (HotkeyAction.Focus, Focus);
         yield return (HotkeyAction.ToggleVisible, ToggleVisible);
+        yield return (HotkeyAction.VariableNameGenerator, VariableNameGenerator);
     }
 }

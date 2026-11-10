@@ -80,10 +80,11 @@
 
         <!-- ==================== 按钮 ==================== -->
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="MinWidth" Value="84" />
-            <Setter Property="Height" Value="34" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="MinHeight" Value="36" />
             <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="Padding" Value="12,7" />
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
             <Setter Property="Background" Value="#FFFFFFFF" />
@@ -120,6 +121,8 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}"/>
 
         <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
             <Setter Property="Background" Value="{StaticResource BrushAccentGradient}" />
@@ -190,6 +193,7 @@
 
         <!-- ==================== 文本 ==================== -->
         <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
@@ -197,11 +201,13 @@
         </Style>
 
         <Style x:Key="HintTextStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Foreground" Value="{StaticResource BrushTextSecondary}" />
         </Style>
 
         <Style x:Key="CaptionStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Foreground" Value="{StaticResource BrushTextTertiary}" />
         </Style>
@@ -209,7 +215,8 @@
         <!-- ==================== 输入框 ==================== -->
         <Style TargetType="TextBox">
             <Setter Property="FontSize" Value="12.5" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Padding" Value="9,6" />
+            <Setter Property="MinHeight" Value="36" />
             <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
             <Setter Property="Background" Value="#FFFFFFFF" />
             <Setter Property="CaretBrush" Value="{StaticResource BrushAccent}" />
@@ -227,7 +234,7 @@
                                 CornerRadius="9">
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          VerticalAlignment="Stretch"
                                           Focusable="False" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -236,7 +243,7 @@
                             </Trigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                 <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource BrushAccent}" />
-                                <Setter TargetName="Root" Property="BorderThickness" Value="1.4" />
+                                <Setter TargetName="Root" Property="BorderThickness" Value="1" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Root" Property="Background" Value="#FFF6F8FB" />
@@ -256,7 +263,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
-                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <Grid Background="Transparent"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                             <Border x:Name="Box" Width="18" Height="18" CornerRadius="5"
                                     Background="#FFFFFFFF" BorderBrush="{StaticResource BrushBorderStrong}"
                                     BorderThickness="1.4" VerticalAlignment="Center">
@@ -265,8 +272,8 @@
                                            HorizontalAlignment="Center" VerticalAlignment="Center"
                                            Visibility="Collapsed" />
                             </Border>
-                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
-                        </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{TemplateBinding Content}" Margin="8,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource BrushAccent}" />
@@ -313,7 +320,8 @@
         </Style>
 
         <Style TargetType="ComboBox">
-            <Setter Property="Height" Value="30" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Padding" Value="9,6" />
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
             <Setter Property="Background" Value="#FFFFFFFF" />
@@ -328,16 +336,17 @@
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="1" CornerRadius="9">
                                 <Grid>
-                                    <ContentPresenter Margin="9,0,26,0" VerticalAlignment="Center"
+                                    <ContentPresenter x:Name="SelectionContent" Margin="9,6,28,6" VerticalAlignment="Center"
                                                       Content="{TemplateBinding SelectionBoxItem}"
                                                       ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+                                    <TextBox x:Name="PART_EditableTextBox" Visibility="Collapsed" Margin="6,2,28,2" MinHeight="28" Padding="3,4" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" IsReadOnly="{TemplateBinding IsReadOnly}"/>
                                     <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="9"
                                                Foreground="{StaticResource BrushTextSecondary}"
                                                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
                                 </Grid>
                             </Border>
 
-                            <ToggleButton Focusable="False" ClickMode="Press" Background="Transparent"
+                            <ToggleButton x:Name="DropToggle" Focusable="False" ClickMode="Press" Background="Transparent"
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
@@ -364,6 +373,12 @@
                             </Popup>
                         </Grid>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="IsEditable" Value="True">
+                                <Setter TargetName="SelectionContent" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="DropToggle" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="DropToggle" Property="Width" Value="28"/>
+                            </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BrushBorderStrong}" />
                             </Trigger>
@@ -414,9 +429,9 @@
 
         <!-- ==================== 标签页 ==================== -->
         <Style TargetType="TabItem">
-            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="{StaticResource BrushTextSecondary}" />
-            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="Padding" Value="16,9" />
             <Setter Property="Margin" Value="0,0,4,0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -430,8 +445,8 @@
                                 <Setter TargetName="Root" Property="Background" Value="#FFEDF3FC" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FFFFFFFF" />
-                                <Setter Property="Foreground" Value="{StaticResource BrushAccent}" />
+                                <Setter TargetName="Root" Property="Background" Value="#286FC4" />
+                                <Setter Property="Foreground" Value="White" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                                 <Setter TargetName="Root" Property="Effect">
                                     <Setter.Value>
@@ -574,6 +589,7 @@
 
         <!-- 磁贴按钮（主面板工具行） -->
         <Style x:Key="TileButtonStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="66"/>
             <Setter Property="Background" Value="#FFFFFFFF" />
             <Setter Property="BorderBrush" Value="{StaticResource BrushBorder}" />
             <Setter Property="BorderThickness" Value="1" />

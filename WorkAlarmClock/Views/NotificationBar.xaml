@@ -1,0 +1,19 @@
+<UserControl x:Class="WorkAlarmClock.Views.NotificationBar"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Border x:Name="Surface" Background="#E7F1FF" BorderBrush="#CDDEF5" BorderThickness="1" CornerRadius="10" Padding="12,8" Visibility="Collapsed">
+  <StackPanel>
+   <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBlock x:Name="CurrentText" TextWrapping="Wrap" Foreground="#264D7C" VerticalAlignment="Center" Margin="0,0,12,0"/>
+    <WrapPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,0">
+     <Button Content="上一条" Click="Previous_Click" Padding="8,4" MinHeight="28" Height="Auto" FontSize="11" Margin="0,0,4,0"/>
+     <Button Content="下一条" Click="Next_Click" Padding="8,4" MinHeight="28" Height="Auto" FontSize="11" Margin="0,0,4,0"/>
+     <Button x:Name="HistoryButton" Content="消息记录" Click="History_Click" Padding="8,4" MinHeight="28" Height="Auto" FontSize="11"/>
+    </WrapPanel>
+   </Grid>
+   <ListBox x:Name="HistoryList" MaxHeight="160" Margin="0,8,0,0" BorderThickness="0" Background="Transparent" Visibility="Collapsed" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+    <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" Foreground="#405C7B" Margin="2,5"/></DataTemplate></ListBox.ItemTemplate>
+   </ListBox>
+  </StackPanel>
+ </Border>
+</UserControl>

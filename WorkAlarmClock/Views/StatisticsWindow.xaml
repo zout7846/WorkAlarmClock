@@ -1,42 +1,44 @@
-﻿<Window x:Class="WorkAlarmClock.Views.StatisticsWindow"
+<Window xmlns:ui="clr-namespace:WorkAlarmClock.Views" x:Class="WorkAlarmClock.Views.StatisticsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="工作统计"
-        Width="660" Height="640"
+        Width="660" Height="704"
         MinWidth="560" MinHeight="560"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource BrushPanelGradient}"
+        Background="#F2F7FD"
         FontFamily="Microsoft YaHei UI">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </Window.Resources>
+ <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions><ui:WorkspaceFrame/><Grid Grid.Row="1"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+
 
     <Grid Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- 顶部：标题 + 区间切换 -->
-        <Grid Grid.Row="0">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <StackPanel Grid.Row="0">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="工作统计" FontSize="19" FontWeight="Bold"
                            Foreground="{StaticResource BrushTextPrimary}" />
                 <TextBlock Text="{Binding RangeTitle}" FontSize="12" Margin="10,4,0,0"
                            Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            </WrapPanel>
+            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,12,0,0">
                 <Button Content="近 7 天" Command="{Binding RangeCommand}" CommandParameter="7"
-                        Style="{StaticResource PrimaryButtonStyle}" Height="30" MinWidth="72" />
+                        Style="{StaticResource PrimaryButtonStyle}" MinWidth="72" />
                 <Button Content="近 14 天" Command="{Binding RangeCommand}" CommandParameter="14"
-                        Style="{StaticResource PrimaryButtonStyle}" Height="30" MinWidth="76" />
+                        Style="{StaticResource PrimaryButtonStyle}" MinWidth="76" />
                 <Button Content="近 30 天" Command="{Binding RangeCommand}" CommandParameter="30"
-                        Style="{StaticResource PrimaryButtonStyle}" Height="30" MinWidth="76" Margin="0" />
-            </StackPanel>
-        </Grid>
+                        Style="{StaticResource PrimaryButtonStyle}" MinWidth="76" Margin="0" />
+            </WrapPanel>
+        </StackPanel>
 
         <!-- 汇总三数字 -->
         <UniformGrid Grid.Row="1" Columns="3" Margin="0,12,0,0">
@@ -63,8 +65,17 @@
             </Border>
         </UniformGrid>
 
+        <StackPanel Grid.Row="2">
+        <Border Style="{StaticResource CardStyle}" Margin="0,12,0,0" Padding="16">
+          <StackPanel><TextBlock Text="工时趋势" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="蓝色：工作 · 绿色：休息 · 单位：小时" Style="{StaticResource HintTextStyle}"/>
+            <ui:TrendChart Values="{Binding WorkTrend}" SecondaryValues="{Binding RestTrend}" Labels="{Binding TrendDates}" Unit="h" Height="180"/>
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource CardStyle}" Margin="0,12,0,0" Padding="16">
+          <StackPanel><TextBlock Text="记录时间分布" Style="{StaticResource SectionTitleStyle}"/><ui:DonutChart Values="{Binding TimeShare}" Labels="{Binding TimeShareLabels}" Unit="h" Height="150"/></StackPanel>
+        </Border>
         <!-- 柱状图 -->
-        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,12,0,0" Padding="14,12">
+        <Border Style="{StaticResource CardStyle}" Margin="0,12,0,0" Padding="14,12">
             <StackPanel>
                 <Grid Margin="0,0,0,6">
                     <TextBlock Text="每日工时" Style="{StaticResource SectionTitleStyle}" Margin="0" />
@@ -119,6 +130,7 @@
             </StackPanel>
         </Border>
 
+        </StackPanel>
         <!-- 今日时间轴 -->
         <Border Grid.Row="3" Style="{StaticResource CardStyle}" Margin="0,12,0,0" Padding="14,12" VerticalAlignment="Top">
             <StackPanel>
@@ -174,4 +186,6 @@
                     MinWidth="82" Margin="0" />
         </StackPanel>
     </Grid>
+
+ </ScrollViewer></Grid></Grid>
 </Window>

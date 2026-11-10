@@ -62,6 +62,11 @@ public sealed class TimelineBarItem
 /// </summary>
 public sealed class StatisticsViewModel : ObservableObject
 {
+    public ObservableCollection<double> WorkTrend { get; } = new();
+    public ObservableCollection<double> RestTrend { get; } = new();
+    public ObservableCollection<string> TrendDates { get; } = new();
+    public ObservableCollection<double> TimeShare { get; } = new();
+    public string[] TimeShareLabels { get; } = { "工作", "休息" };
     /// <summary>柱状图绘图区高度（像素）。</summary>
     private const double ChartHeight = 132;
 
@@ -179,6 +184,7 @@ public sealed class StatisticsViewModel : ObservableObject
             };
 
             Bars.Clear();
+            WorkTrend.Clear(); RestTrend.Clear(); TrendDates.Clear(); TimeShare.Clear();
             double sum = 0;
             DayStat? best = null;
 
@@ -188,6 +194,7 @@ public sealed class StatisticsViewModel : ObservableObject
                 double work = Math.Max(0, day.Work.TotalHours);
                 double rest = Math.Max(0, day.Rest.TotalHours);
                 sum += work;
+                WorkTrend.Add(work); RestTrend.Add(rest); TrendDates.Add(day.Date.ToString("MM.dd"));
 
                 if (best is null || work > best.Work.TotalHours)
                 {
@@ -216,6 +223,7 @@ public sealed class StatisticsViewModel : ObservableObject
             }
 
             TimeSpan total = TimeSpan.FromHours(sum);
+            TimeShare.Add(sum); TimeShare.Add(days.Sum(d => Math.Max(0, d.Rest.TotalHours)));
             int workdayCount = days.Count(d => d.IsWorkday);
             TotalWorkText = FormatHours(total);
             AverageWorkText = workdayCount == 0

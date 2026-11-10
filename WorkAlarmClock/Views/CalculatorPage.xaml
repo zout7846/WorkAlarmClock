@@ -1,0 +1,80 @@
+<UserControl x:Class="WorkAlarmClock.Views.CalculatorPage"
+             x:Name="Root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="Padding" Value="3,8"/>
+            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="FontSize" Value="16"/>
+        </Style>
+        <Style x:Key="ExpressionTextOnly" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Visible"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Mode, ElementName=Root}" Value="Radix">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RadixTextOnly" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Mode, ElementName=Root}" Value="Radix">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ExpressionPanelOnly" TargetType="Panel">
+            <Setter Property="Visibility" Value="Visible"/>
+            <Style.Triggers><DataTrigger Binding="{Binding Mode, ElementName=Root}" Value="Radix"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="RadixPanelOnly" TargetType="Panel">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers><DataTrigger Binding="{Binding Mode, ElementName=Root}" Value="Radix"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Border Background="White" CornerRadius="14" Padding="16" BorderBrush="#DDEAF7" BorderThickness="1" MaxWidth="720" HorizontalAlignment="Stretch">
+        <StackPanel>
+            <TextBlock Text="计算器" FontSize="19" FontWeight="SemiBold" Foreground="#23476E" Style="{StaticResource ExpressionTextOnly}"/>
+            <TextBlock Text="支持四则运算、括号、小数；Enter 计算，Esc 清空" Foreground="#66758A" Margin="0,6,0,12" Style="{StaticResource ExpressionTextOnly}"/>
+            <TextBlock Text="进制转换" FontSize="19" FontWeight="SemiBold" Foreground="#23476E" Style="{StaticResource RadixTextOnly}"/>
+            <TextBlock Text="输入整数并选择输入、输出进制，结果同时列出常用进制。" TextWrapping="Wrap" Foreground="#66758A" Margin="0,6,0,12" Style="{StaticResource RadixTextOnly}"/>
+            <WrapPanel Orientation="Horizontal" Margin="0,0,0,10" Style="{StaticResource RadixPanelOnly}">
+                <StackPanel><TextBlock Text="输入进制" Foreground="#66758A" Margin="0,0,0,4"/><ComboBox x:Name="InputBase" Width="150" SelectedIndex="2"><ComboBoxItem Content="二进制 (2)" Tag="2"/><ComboBoxItem Content="八进制 (8)" Tag="8"/><ComboBoxItem Content="十进制 (10)" Tag="10"/><ComboBoxItem Content="十六进制 (16)" Tag="16"/></ComboBox></StackPanel>
+                <StackPanel Margin="14,0,0,0"><TextBlock Text="输出进制" Foreground="#66758A" Margin="0,0,0,4"/><ComboBox x:Name="OutputBase" Width="150" SelectedIndex="3"><ComboBoxItem Content="二进制 (2)" Tag="2"/><ComboBoxItem Content="八进制 (8)" Tag="8"/><ComboBoxItem Content="十进制 (10)" Tag="10"/><ComboBoxItem Content="十六进制 (16)" Tag="16"/></ComboBox></StackPanel>
+            </WrapPanel>
+            <TextBlock Text="表达式" Foreground="#66758A" Margin="0,0,0,5" Style="{StaticResource ExpressionTextOnly}"/>
+            <TextBlock Text="整数输入" Foreground="#66758A" Margin="0,0,0,5" Style="{StaticResource RadixTextOnly}"/>
+            <TextBox x:Name="Expression" FontSize="20" MinHeight="42" KeyDown="OnExpressionKeyDown" ToolTip="例如 (120 + 80) * 0.85">
+                <TextBox.Style>
+                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                        <Style.Triggers><DataTrigger Binding="{Binding Mode, ElementName=Root}" Value="Radix"><Setter Property="ToolTip" Value="整数，例如二进制输入 1010，十六进制输入 FF"/></DataTrigger></Style.Triggers>
+                    </Style>
+                </TextBox.Style>
+            </TextBox>
+            <TextBlock x:Name="Result" Text="= 0" FontSize="28" Foreground="#216CC5" Margin="0,10" TextWrapping="Wrap" Style="{StaticResource ExpressionTextOnly}"/>
+            <TextBlock x:Name="RadixResult" Foreground="#216CC5" FontSize="17" TextWrapping="Wrap" Margin="0,8,0,0" Style="{StaticResource RadixTextOnly}"/>
+            <UniformGrid Columns="4" Style="{StaticResource ExpressionPanelOnly}">
+                <Button Content="7" Click="OnKey"/><Button Content="8" Click="OnKey"/><Button Content="9" Click="OnKey"/><Button Content="÷" Tag="/" Click="OnKey"/>
+                <Button Content="4" Click="OnKey"/><Button Content="5" Click="OnKey"/><Button Content="6" Click="OnKey"/><Button Content="×" Tag="*" Click="OnKey"/>
+                <Button Content="1" Click="OnKey"/><Button Content="2" Click="OnKey"/><Button Content="3" Click="OnKey"/><Button Content="−" Tag="-" Click="OnKey"/>
+                <Button Content="0" Click="OnKey"/><Button Content="." Click="OnKey"/><Button Content="=" Click="OnCalculate"/><Button Content="+" Click="OnKey"/>
+                <Button Content="(" Click="OnKey"/><Button Content=")" Click="OnKey"/><Button Content="退格" Click="OnBackspace"/><Button Content="清空" Click="OnClear"/>
+            </UniformGrid>
+            <UniformGrid Columns="6" Style="{StaticResource RadixPanelOnly}">
+                <Button Content="A" Click="OnKey"/><Button Content="B" Click="OnKey"/><Button Content="C" Click="OnKey"/><Button Content="D" Click="OnKey"/><Button Content="E" Click="OnKey"/><Button Content="F" Click="OnKey"/>
+                <Button Content="7" Click="OnKey"/><Button Content="8" Click="OnKey"/><Button Content="9" Click="OnKey"/><Button Content="4" Click="OnKey"/><Button Content="5" Click="OnKey"/><Button Content="6" Click="OnKey"/>
+                <Button Content="1" Click="OnKey"/><Button Content="2" Click="OnKey"/><Button Content="3" Click="OnKey"/><Button Content="0" Click="OnKey"/><Button Content="-" Click="OnKey"/><Button Content="退格" Click="OnBackspace"/>
+            </UniformGrid>
+            <WrapPanel Orientation="Horizontal" Margin="0,10,0,0" Style="{StaticResource RadixPanelOnly}">
+                <Button Content="转换" Click="OnConvertRadix" Style="{StaticResource AccentButtonStyle}"/>
+                <Button Content="清空" Click="OnClear"/>
+                <TextBlock Text="支持 0–9、A–F；可转换负整数" VerticalAlignment="Center" Foreground="#66758A" Margin="10,0,0,0"/>
+            </WrapPanel>
+            <TextBlock x:Name="History" Foreground="#66758A" Margin="0,12,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+    </Border>
+</UserControl>

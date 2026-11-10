@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using WorkAlarmClock.ViewModels;
 
@@ -9,7 +9,6 @@ namespace WorkAlarmClock.Views;
 /// </summary>
 public static class DialogManager
 {
-    private static SettingsWindow? _settingsWindow;
     private static ReportPreviewWindow? _previewWindow;
     private static StrongReminderWindow? _strongWindow;
     private static StatisticsWindow? _statisticsWindow;
@@ -18,6 +17,73 @@ public static class DialogManager
     private static CountdownWindow? _countdownWindow;
     private static WeatherWindow? _weatherWindow;
     private static SpeedTestWindow? _speedTestWindow;
+    private static CalculatorWindow? _calculatorWindow;
+    private static CalculatorWindow? _radixWindow;
+    private static CodeToolWindow? _codeToolWindow;
+    private static VariableNameGeneratorWindow? _variableNameWindow;
+    private static ImageConverterWindow? _imageConverterWindow;
+
+    public static void ShowVariableNameGenerator()
+    {
+        if (!Revive(ref _variableNameWindow))
+        {
+            _variableNameWindow = new VariableNameGeneratorWindow();
+            _variableNameWindow.Closed += (_, _) => _variableNameWindow = null;
+            _variableNameWindow.Show();
+        }
+        Activate(_variableNameWindow);
+    }
+
+    public static void ShowImageConverter()
+    {
+        if (!Revive(ref _imageConverterWindow))
+        {
+            _imageConverterWindow = new ImageConverterWindow();
+            _imageConverterWindow.Closed += (_, _) => _imageConverterWindow = null;
+            _imageConverterWindow.Show();
+        }
+        Activate(_imageConverterWindow);
+    }
+
+    /// <summary>显示（或激活）二维码与条码工具。</summary>
+    public static void ShowCodeTool()
+    {
+        if (!Revive(ref _codeToolWindow))
+        {
+            _codeToolWindow = new CodeToolWindow();
+            _codeToolWindow.Closed += (_, _) => _codeToolWindow = null;
+            _codeToolWindow.Show();
+        }
+        Activate(_codeToolWindow);
+    }
+
+    /// <summary>显示（或激活）计算器窗口。</summary>
+    public static void ShowCalculator() => ShowCalculatorWindow("Expression");
+
+    /// <summary>显示（或激活）进制转换窗口。</summary>
+    public static void ShowRadixConverter() => ShowCalculatorWindow("Radix");
+
+    private static void ShowCalculatorWindow(string mode)
+    {
+        CalculatorWindow? window = mode == "Radix" ? _radixWindow : _calculatorWindow;
+        if (!Revive(ref window))
+        {
+            window = new CalculatorWindow(mode);
+            if (mode == "Radix")
+            {
+                _radixWindow = window;
+                window.Closed += (_, _) => _radixWindow = null;
+            }
+            else
+            {
+                _calculatorWindow = window;
+                window.Closed += (_, _) => _calculatorWindow = null;
+            }
+            window.Show();
+        }
+
+        Activate(window);
+    }
 
     /// <summary>显示（或激活）网络测速窗口。</summary>
     public static void ShowSpeedTest()
@@ -110,19 +176,7 @@ public static class DialogManager
     }
 
     /// <summary>显示（或激活）设置面板。</summary>
-    public static void ShowSettings()
-    {
-        if (!Revive(ref _settingsWindow))
-        {
-            SettingsViewModel viewModel = new SettingsViewModel();
-            _settingsWindow = new SettingsWindow { DataContext = viewModel };
-            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-            viewModel.CloseRequested += (_, _) => _settingsWindow?.Close();
-            _settingsWindow.Show();
-        }
-
-        Activate(_settingsWindow);
-    }
+    public static void ShowSettings() => App.ShowSettingsPage();
 
     /// <summary>显示（或激活）日报预览面板（每次打开重建视图模型以读取最新数据）。</summary>
     public static void ShowReportPreview()

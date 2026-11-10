@@ -51,6 +51,97 @@ public sealed class SettingsViewModel : ObservableObject
         ExportCsvCommand = new RelayCommand(ExportCsv);
         ResetPetImageCommand = new RelayCommand(() => PetImagePath = string.Empty);
         ResetFooterCommand = new RelayCommand(ResetFooter);
+        RelocateCommand = new RelayCommand(RelocateByIp);
+        ApplyCoordinatesCommand = new RelayCommand(ApplyCoordinates);
+        _selectedCity = ResolveCityPreset();
+    }
+
+    /// <summary>内置城市列表（手动指定地区用）。</summary>
+    public IReadOnlyList<CityPreset> CityOptions => CityPresets.All;
+
+    /// <summary>手动指定地区：开启后不再用 IP 定位。</summary>
+    public bool UseManualLocation
+    {
+        get => Draft.WeatherManualLocation;
+        set
+        {
+            if (Draft.WeatherManualLocation == value)
+            {
+                return;
+            }
+
+            Draft.WeatherManualLocation = value;
+            if (value)
+            {
+                Draft.WeatherAutoLocate = false;
+                OnPropertyChanged(nameof(Draft));
+            }
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanAutoLocate));
+            AutoSaveWeather();
+        }
+    }
+
+    /// <summary>IP 自动定位是否可用（手动指定时禁用）。</summary>
+    public bool CanAutoLocate => !Draft.WeatherManualLocation;
+
+    /// <summary>选中的城市；选择后立即写入经纬度并保存。</summary>
+    public CityPreset? SelectedCity
+    {
+        get => _selectedCity;
+        set
+        {
+            if (ReferenceEquals(_selectedCity, value))
+            {
+                return;
+            }
+
+            _selectedCity = value;
+            OnPropertyChanged();
+
+            if (value is null)
+            {
+                return;
+            }
+
+            Draft.WeatherCity = value.Name;
+            Draft.WeatherLatitude = value.Latitude;
+            Draft.WeatherLongitude = value.Longitude;
+            Draft.WeatherManualLocation = true;
+            Draft.WeatherAutoLocate = false;
+            OnPropertyChanged(nameof(Draft));
+            OnPropertyChanged(nameof(UseManualLocation));
+            OnPropertyChanged(nameof(CanAutoLocate));
+            AutoSaveWeather();
+        }
+    }
+
+    /// <summary>当前地区说明（城市 + 经纬度）。</summary>
+    public string WeatherLocationText =>
+        string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "{0} · {1:0.####}, {2:0.####}",
+            string.IsNullOrWhiteSpace(Draft.WeatherCity) ? "未设置" : Draft.WeatherCity,
+            Draft.WeatherLatitude,
+            Draft.WeatherLongitude);
+
+    /// <summary>按 IP 重新定位命令。</summary>
+    public RelayCommand RelocateCommand { get; }
+
+    /// <summary>应用手填坐标命令。</summary>
+    public RelayCommand ApplyCoordinatesCommand { get; }
+
+    /// <summary>应用手填经纬度（自动保存并刷新天气）。</summary>
+    private void ApplyCoordinates()
+    {
+        Draft.WeatherManualLocation = true;
+        Draft.WeatherAutoLocate = false;
+        OnPropertyChanged(nameof(UseManualLocation));
+        OnPropertyChanged(nameof(Draft));
+        _selectedCity = ResolveCityPreset();
+        OnPropertyChanged(nameof(SelectedCity));
+        AutoSaveWeather();
     }
 
     /// <summary>设置草稿（布尔/数组/目录/时间/热键/页脚等直接绑定此对象）。</summary>
@@ -172,6 +263,13 @@ public sealed class SettingsViewModel : ObservableObject
     {
         get => Draft.Hotkeys.Focus;
         set { Draft.Hotkeys.Focus = value; OnPropertyChanged(); ValidateLive(); }
+    }
+
+    /// <summary>变量名生成器热键组合。</summary>
+    public HotkeyCombo HotkeyVariableNameGenerator
+    {
+        get => Draft.Hotkeys.VariableNameGenerator;
+        set { Draft.Hotkeys.VariableNameGenerator = value; OnPropertyChanged(); ValidateLive(); }
     }
 
     /// <summary>浏览截图目录命令。</summary>
@@ -308,6 +406,74 @@ public sealed class SettingsViewModel : ObservableObject
     /// <summary>浏览汇报目录命令。</summary>
     public RelayCommand BrowseDirectoryCommand { get; }
 
+    private CityPreset? _selectedCity;
+
+    /// <summary>按城市名匹配预设，匹配不到则返回 null。</summary>
+    private CityPreset? ResolveCityPreset()
+    {
+        if (string.IsNullOrWhiteSpace(Draft.WeatherCity))
+        {
+            return null;
+        }
+
+        foreach (CityPreset preset in CityPresets.All)
+        {
+            if (string.Equals(preset.Name, Draft.WeatherCity, StringComparison.Ordinal))
+            {
+                return preset;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>立即落盘天气地区（自动保存，不等「保存」按钮）。</summary>
+    private void AutoSaveWeather()
+    {
+        try
+        {
+            AppServices.Settings.TryUpdate(Draft.Clone());
+            _ = AppServices.Weather.RefreshAsync();
+            OnPropertyChanged(nameof(WeatherLocationText));
+        }
+        catch (Exception ex)
+        {
+            Infrastructure.AppEnvironment.Log("保存天气地区失败。", ex);
+        }
+    }
+
+    /// <summary>按 IP 重新定位并同步回草稿。</summary>
+    private async void RelocateByIp()
+    {
+        try
+        {
+            Draft.WeatherManualLocation = false;
+            Draft.WeatherAutoLocate = true;
+            OnPropertyChanged(nameof(UseManualLocation));
+            OnPropertyChanged(nameof(Draft));
+
+            await AppServices.Weather.LocateAsync(WeatherLocateTrigger.Manual);
+
+            AppSettings saved = AppServices.Settings.Current;
+            Draft.WeatherCity = saved.WeatherCity;
+            Draft.WeatherLatitude = saved.WeatherLatitude;
+            Draft.WeatherLongitude = saved.WeatherLongitude;
+            Draft.WeatherManualLocation = saved.WeatherManualLocation;
+            Draft.WeatherAutoLocate = saved.WeatherAutoLocate;
+            Draft.WeatherLocatedAt = saved.WeatherLocatedAt;
+            _selectedCity = ResolveCityPreset();
+            OnPropertyChanged(nameof(SelectedCity));
+            OnPropertyChanged(nameof(Draft));
+            OnPropertyChanged(nameof(WeatherLocationText));
+            OnPropertyChanged(nameof(UseManualLocation));
+            OnPropertyChanged(nameof(CanAutoLocate));
+        }
+        catch (Exception ex)
+        {
+            Infrastructure.AppEnvironment.Log("按 IP 重新定位失败。", ex);
+        }
+    }
+
     /// <summary>清空日报页脚命令。</summary>
     public RelayCommand ResetFooterCommand { get; }
 
@@ -330,6 +496,7 @@ public sealed class SettingsViewModel : ObservableObject
         }
 
         ValidationError = string.Empty;
+        PageNotifications.Publish("设置已保存", "新设置已生效。快捷键注册结果可在消息记录中查看。");
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 

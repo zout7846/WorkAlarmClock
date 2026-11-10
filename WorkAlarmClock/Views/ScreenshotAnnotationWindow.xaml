@@ -1,4 +1,4 @@
-<Window x:Class="WorkAlarmClock.Views.ScreenshotAnnotationWindow"
+﻿<Window x:Class="WorkAlarmClock.Views.ScreenshotAnnotationWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="截图标注"
@@ -16,7 +16,7 @@
 
         <!-- 工具条 -->
         <Border Grid.Row="0" Background="#FF27313D" CornerRadius="10" Padding="10,8">
-            <StackPanel Orientation="Horizontal">
+            <WrapPanel Orientation="Horizontal">
                 <ToggleButton x:Name="RectTool" IsChecked="True" Click="OnToolClick"
                               Style="{StaticResource ToolToggleStyle}" Tag="Rect" ToolTip="矩形">
                     <TextBlock Text="&#x25A1;" FontSize="15" />
@@ -34,13 +34,14 @@
                     <TextBlock Text="T" FontSize="14" FontWeight="Bold" />
                 </ToggleButton>
 
+                <ToggleButton x:Name="MosaicTool" Click="OnToolClick" Style="{StaticResource ToolToggleStyle}" Tag="Mosaic" ToolTip="马赛克：拖动框选区域，可撤销"><TextBlock Text="马赛克" FontSize="12"/></ToggleButton>
                 <Border Width="1" Background="#FF3A4655" Margin="10,2" />
 
-                <Button x:Name="ColorRed" Width="26" Height="26" Margin="0,0,6,0" Cursor="Hand" ToolTip="红色"
+                <Button x:Name="ColorRed" Style="{x:Null}" Width="26" Height="26" Margin="0,0,6,0" Cursor="Hand" ToolTip="红色"
                         Background="#FFFF4D4F" BorderThickness="0" Click="OnColorClick" Tag="#FFFF4D4F" />
-                <Button x:Name="ColorYellow" Width="26" Height="26" Margin="0,0,6,0" Cursor="Hand" ToolTip="黄色"
+                <Button x:Name="ColorYellow" Style="{x:Null}" Width="26" Height="26" Margin="0,0,6,0" Cursor="Hand" ToolTip="黄色"
                         Background="#FFFFC53D" BorderThickness="0" Click="OnColorClick" Tag="#FFFFC53D" />
-                <Button x:Name="ColorBlue" Width="26" Height="26" Margin="0,0,6,0" Cursor="Hand" ToolTip="蓝色"
+                <Button x:Name="ColorBlue" Style="{x:Null}" Width="26" Height="26" Margin="0,0,6,0" Cursor="Hand" ToolTip="蓝色"
                         Background="#FF3B7DF6" BorderThickness="0" Click="OnColorClick" Tag="#FF3B7DF6" />
 
                 <Border Width="1" Background="#FF3A4655" Margin="10,2" />
@@ -60,7 +61,7 @@
                 <Button Click="OnClose" Style="{StaticResource DarkButtonStyle}" MinWidth="34" Margin="8,0,0,0" ToolTip="关闭">
                     <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
                 </Button>
-            </StackPanel>
+            </WrapPanel>
         </Border>
 
         <!-- 画布 -->
@@ -81,6 +82,7 @@
         </Border>
 
         <TextBlock x:Name="StatusText" Grid.Row="2" Foreground="#FFB9C4D2" FontSize="11.5" Margin="2,8,0,0"
+                   TextWrapping="Wrap"
                    Text="矩形/箭头/画笔可直接在图上拖动绘制；保存后写入截图目录。" />
     </Grid>
 </Window>

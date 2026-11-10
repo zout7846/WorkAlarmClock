@@ -1,6 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
+using System.Collections.Generic;
+using WorkAlarmClock.Models;
 using WorkAlarmClock.Infrastructure;
 using WorkAlarmClock.Services;
 
@@ -27,6 +30,18 @@ public sealed class DayForecastItem
 /// </summary>
 public sealed class WeatherViewModel : ObservableObject
 {
+    public IReadOnlyList<CityPreset> CityOptions => CityPresets.All;
+    private CityPreset? _selectedCity;
+    public CityPreset? SelectedCity { get => _selectedCity; set => SetProperty(ref _selectedCity, value); }
+    public RelayCommand ApplyCityCommand { get; }
+    public string LocationText => (AppServices.Settings.Current.WeatherManualLocation ? "手动地区 · " : "IP 近似定位 · ") + AppServices.Settings.Current.WeatherCity;
+    private bool _isBusy;
+    private string _statusText = string.Empty;
+    public bool IsIdle => !_isBusy;
+    public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }
+    public ObservableCollection<HourForecastItem> Hours { get; } = new();
+    public ObservableCollection<double> RainTrend { get; } = new();
+    public ObservableCollection<string> HourLabels { get; } = new();
     private string _cityText = "加载中…";
     private string _temperatureText = "--";
     private string _descriptionText = string.Empty;
@@ -37,6 +52,8 @@ public sealed class WeatherViewModel : ObservableObject
     public WeatherViewModel()
     {
         Days = new ObservableCollection<DayForecastItem>();
+        SelectedCity = CityOptions.FirstOrDefault(c => c.Name == AppServices.Settings.Current.WeatherCity);
+        ApplyCityCommand = new RelayCommand(() => _ = ApplyCityAsync());
         RefreshCommand = new RelayCommand(() => _ = RefreshAsync());
         LocateCommand = new RelayCommand(() => _ = LocateAsync());
         CloseCommand = new RelayCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
@@ -101,27 +118,64 @@ public sealed class WeatherViewModel : ObservableObject
 
     private async System.Threading.Tasks.Task RefreshAsync()
     {
-        await AppServices.Weather.RefreshAsync();
+        if (_isBusy) return;
+        SetBusy(true);
+        try { await AppServices.Weather.RefreshAsync(); }
+        finally { SetBusy(false); }
     }
 
     private async System.Threading.Tasks.Task LocateAsync()
     {
-        CityText = "定位中…";
-        DescriptionText = "正在按 IP 解析位置";
-        await AppServices.Weather.LocateAsync();
+        if (_isBusy) return;
+        SetBusy(true);
+        StatusText = "正在按 IP 解析位置…";
+        try { await AppServices.Weather.LocateAsync(WeatherLocateTrigger.Manual); }
+        finally { SetBusy(false); }
+    }
+
+    private async System.Threading.Tasks.Task ApplyCityAsync()
+    {
+        if (_isBusy) return;
+        if (SelectedCity is not {} city) { StatusText = "请从列表选择城市后应用"; return; }
+        SetBusy(true);
+        try
+        {
+            var draft = AppServices.Settings.Current.Clone();
+            draft.WeatherCity = city.Name;
+            draft.WeatherLatitude = city.Latitude;
+            draft.WeatherLongitude = city.Longitude;
+            draft.WeatherManualLocation = true;
+            draft.WeatherAutoLocate = false;
+            draft.WeatherLocatedAt = null;
+            var result = AppServices.Settings.TryUpdate(draft);
+            if (!result.Ok) { StatusText = result.Error ?? "地区保存失败"; return; }
+            OnPropertyChanged(nameof(LocationText));
+            await AppServices.Weather.RefreshAsync();
+        }
+        finally { SetBusy(false); }
+    }
+
+    private void SetBusy(bool value)
+    {
+        _isBusy = value;
+        OnPropertyChanged(nameof(IsIdle));
     }
 
     private void OnUpdated(object? sender, EventArgs e)
     {
+        StatusText = AppServices.Weather.StatusText;
+        OnPropertyChanged(nameof(LocationText));
         WeatherSnapshot? snapshot = AppServices.Weather.Current;
-        if (snapshot is null)
+        if (snapshot is null || snapshot.City != AppServices.Settings.Current.WeatherCity)
         {
-            CityText = "暂无数据";
+            CityText = AppServices.Settings.Current.WeatherCity;
             TemperatureText = "--";
             DescriptionText = "请稍后刷新重试";
             IconGlyph = "\uE753";
             UpdatedText = string.Empty;
             Days.Clear();
+            Hours.Clear();
+            RainTrend.Clear(); HourLabels.Clear();
             return;
         }
 
@@ -129,7 +183,25 @@ public sealed class WeatherViewModel : ObservableObject
         TemperatureText = snapshot.Temperature.ToString("0.#", CultureInfo.InvariantCulture) + "°";
         DescriptionText = snapshot.Description;
         IconGlyph = snapshot.IconGlyph;
-        UpdatedText = "更新于 " + snapshot.UpdatedAt.LocalDateTime.ToString("HH:mm", CultureInfo.InvariantCulture);
+        UpdatedText = "获取 " + snapshot.UpdatedAt.LocalDateTime.ToString("HH:mm:ss") +
+            (snapshot.ObservedAt is {} observed ? " · 天气时刻 " + observed.ToString("MM-dd HH:mm") : "");
+        Hours.Clear();
+        RainTrend.Clear(); HourLabels.Clear();
+        foreach (var hour in snapshot.Hours)
+        {
+            // Missing probabilities remain absent from the trend rather than looking like 0%.
+            if (hour.Probability is {} probability)
+            {
+                RainTrend.Add(Math.Clamp(probability, 0, 100));
+                HourLabels.Add(hour.Time.ToString("HH:mm"));
+            }
+        }
+        foreach (var hour in snapshot.Hours)
+            Hours.Add(new HourForecastItem(
+                hour.Time.ToString("HH:mm"), hour.Temperature.ToString("0") + "°",
+                hour.Probability is {} probability ? probability.ToString("0") + "%" : "—",
+                hour.Precipitation is {} rain ? rain.ToString("0.#") + " mm" : "—",
+                hour.Probability is {} p ? Math.Clamp(p, 0, 100) : 0));
 
         Days.Clear();
         foreach (DailyForecast day in snapshot.Days)
@@ -156,3 +228,5 @@ public sealed class WeatherViewModel : ObservableObject
         _ => "周日"
     };
 }
+
+public sealed record HourForecastItem(string Time, string Temperature, string Probability, string Rain, double BarHeight);
