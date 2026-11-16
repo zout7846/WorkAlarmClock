@@ -1,14 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Windows;
+using WorkAlarmClock.Infrastructure;
 using WorkAlarmClock.ViewModels;
 
 namespace WorkAlarmClock.Views;
 
 /// <summary>
-/// 弹窗管理器：设置 / 日报预览 / 强提醒遮罩三个窗口的单例创建与复用（已关闭则重建）。
+/// 弹窗管理器：所有工具窗口共用「同一时刻只有一个可见窗体」的规则，
+/// 打开新工具时自动隐藏上一个（实例保留，状态不丢），避免桌面堆满窗口。
+/// 窗口真正关闭后引用清空，下次打开自动重建。
+/// 强提醒遮罩为全屏独占，不参与工具互斥。
 /// </summary>
 public static class DialogManager
 {
+    /// <summary>已登记的工具窗口集合，用于互斥显示。</summary>
+    private static readonly List<Window> ToolWindows = new();
+
     private static ReportPreviewWindow? _previewWindow;
     private static StrongReminderWindow? _strongWindow;
     private static StatisticsWindow? _statisticsWindow;
@@ -29,9 +37,9 @@ public static class DialogManager
         {
             _variableNameWindow = new VariableNameGeneratorWindow();
             _variableNameWindow.Closed += (_, _) => _variableNameWindow = null;
-            _variableNameWindow.Show();
+            Track(_variableNameWindow);
         }
-        Activate(_variableNameWindow);
+        Present(_variableNameWindow);
     }
 
     public static void ShowImageConverter()
@@ -40,9 +48,9 @@ public static class DialogManager
         {
             _imageConverterWindow = new ImageConverterWindow();
             _imageConverterWindow.Closed += (_, _) => _imageConverterWindow = null;
-            _imageConverterWindow.Show();
+            Track(_imageConverterWindow);
         }
-        Activate(_imageConverterWindow);
+        Present(_imageConverterWindow);
     }
 
     /// <summary>显示（或激活）二维码与条码工具。</summary>
@@ -52,9 +60,9 @@ public static class DialogManager
         {
             _codeToolWindow = new CodeToolWindow();
             _codeToolWindow.Closed += (_, _) => _codeToolWindow = null;
-            _codeToolWindow.Show();
+            Track(_codeToolWindow);
         }
-        Activate(_codeToolWindow);
+        Present(_codeToolWindow);
     }
 
     /// <summary>显示（或激活）计算器窗口。</summary>
@@ -65,24 +73,25 @@ public static class DialogManager
 
     private static void ShowCalculatorWindow(string mode)
     {
-        CalculatorWindow? window = mode == "Radix" ? _radixWindow : _calculatorWindow;
-        if (!Revive(ref window))
+        if (mode == "Radix")
         {
-            window = new CalculatorWindow(mode);
-            if (mode == "Radix")
+            if (!Revive(ref _radixWindow))
             {
-                _radixWindow = window;
-                window.Closed += (_, _) => _radixWindow = null;
+                _radixWindow = new CalculatorWindow(mode);
+                _radixWindow.Closed += (_, _) => _radixWindow = null;
+                Track(_radixWindow);
             }
-            else
-            {
-                _calculatorWindow = window;
-                window.Closed += (_, _) => _calculatorWindow = null;
-            }
-            window.Show();
+            Present(_radixWindow);
+            return;
         }
 
-        Activate(window);
+        if (!Revive(ref _calculatorWindow))
+        {
+            _calculatorWindow = new CalculatorWindow(mode);
+            _calculatorWindow.Closed += (_, _) => _calculatorWindow = null;
+            Track(_calculatorWindow);
+        }
+        Present(_calculatorWindow);
     }
 
     /// <summary>显示（或激活）网络测速窗口。</summary>
@@ -94,10 +103,10 @@ public static class DialogManager
             _speedTestWindow = new SpeedTestWindow { DataContext = viewModel };
             _speedTestWindow.Closed += (_, _) => _speedTestWindow = null;
             viewModel.CloseRequested += (_, _) => _speedTestWindow?.Close();
-            _speedTestWindow.Show();
+            Track(_speedTestWindow);
         }
 
-        Activate(_speedTestWindow);
+        Present(_speedTestWindow);
     }
 
     /// <summary>显示（或激活）剪贴板历史窗口。</summary>
@@ -109,10 +118,10 @@ public static class DialogManager
             _clipboardWindow = new ClipboardHistoryWindow { DataContext = viewModel };
             _clipboardWindow.Closed += (_, _) => _clipboardWindow = null;
             viewModel.CloseRequested += (_, _) => _clipboardWindow?.Close();
-            _clipboardWindow.Show();
+            Track(_clipboardWindow);
         }
 
-        Activate(_clipboardWindow);
+        Present(_clipboardWindow);
     }
 
     /// <summary>显示（或激活）倒计时窗口。</summary>
@@ -124,10 +133,10 @@ public static class DialogManager
             _countdownWindow = new CountdownWindow { DataContext = viewModel };
             _countdownWindow.Closed += (_, _) => _countdownWindow = null;
             viewModel.CloseRequested += (_, _) => _countdownWindow?.Close();
-            _countdownWindow.Show();
+            Track(_countdownWindow);
         }
 
-        Activate(_countdownWindow);
+        Present(_countdownWindow);
     }
 
     /// <summary>显示（或激活）天气窗口。</summary>
@@ -139,13 +148,13 @@ public static class DialogManager
             _weatherWindow = new WeatherWindow { DataContext = viewModel };
             _weatherWindow.Closed += (_, _) => _weatherWindow = null;
             viewModel.CloseRequested += (_, _) => _weatherWindow?.Close();
-            _weatherWindow.Show();
+            Track(_weatherWindow);
         }
 
-        Activate(_weatherWindow);
+        Present(_weatherWindow);
     }
 
-    /// <summary>显示（或激活）历史日报窗口（每次打开重建视图模型以读取最新数据）。</summary>
+    /// <summary>显示（或激活）历史日报窗口。</summary>
     public static void ShowReportHistory()
     {
         if (!Revive(ref _historyWindow))
@@ -154,13 +163,13 @@ public static class DialogManager
             _historyWindow = new ReportHistoryWindow { DataContext = viewModel };
             _historyWindow.Closed += (_, _) => _historyWindow = null;
             viewModel.CloseRequested += (_, _) => _historyWindow?.Close();
-            _historyWindow.Show();
+            Track(_historyWindow);
         }
 
-        Activate(_historyWindow);
+        Present(_historyWindow);
     }
 
-    /// <summary>显示（或激活）统计窗口（每次打开重建视图模型以读取最新数据）。</summary>
+    /// <summary>显示（或激活）统计窗口。</summary>
     public static void ShowStatistics()
     {
         if (!Revive(ref _statisticsWindow))
@@ -169,16 +178,16 @@ public static class DialogManager
             _statisticsWindow = new StatisticsWindow { DataContext = viewModel };
             _statisticsWindow.Closed += (_, _) => _statisticsWindow = null;
             viewModel.CloseRequested += (_, _) => _statisticsWindow?.Close();
-            _statisticsWindow.Show();
+            Track(_statisticsWindow);
         }
 
-        Activate(_statisticsWindow);
+        Present(_statisticsWindow);
     }
 
-    /// <summary>显示（或激活）设置面板。</summary>
+    /// <summary>显示（或激活）设置面板（主面板内嵌页，不占独立窗口）。</summary>
     public static void ShowSettings() => App.ShowSettingsPage();
 
-    /// <summary>显示（或激活）日报预览面板（每次打开重建视图模型以读取最新数据）。</summary>
+    /// <summary>显示（或激活）日报预览面板。</summary>
     public static void ShowReportPreview()
     {
         if (!Revive(ref _previewWindow))
@@ -187,13 +196,13 @@ public static class DialogManager
             _previewWindow = new ReportPreviewWindow { DataContext = viewModel };
             _previewWindow.Closed += (_, _) => _previewWindow = null;
             viewModel.CloseRequested += (_, _) => _previewWindow?.Close();
-            _previewWindow.Show();
+            Track(_previewWindow);
         }
 
-        Activate(_previewWindow);
+        Present(_previewWindow);
     }
 
-    /// <summary>显示（或激活）强提醒全屏遮罩（未确认时不可关闭）。</summary>
+    /// <summary>显示（或激活）强提醒全屏遮罩（未确认时不可关闭；全屏独占，不参与工具互斥）。</summary>
     public static void ShowStrongReminder()
     {
         if (!Revive(ref _strongWindow))
@@ -210,6 +219,65 @@ public static class DialogManager
         }
 
         Activate(_strongWindow);
+    }
+
+    /// <summary>登记窗口；真正关闭时自动移出互斥集合。</summary>
+    private static void Track(Window window)
+    {
+        if (!ToolWindows.Contains(window))
+        {
+            ToolWindows.Add(window);
+        }
+
+        window.Closed += (_, _) => ToolWindows.Remove(window);
+    }
+
+    /// <summary>显示目标工具窗口，并隐藏其它所有仍可见的工具窗口，保证同一时刻只有一个。</summary>
+    private static void Present(Window? window)
+    {
+        if (window is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!window.IsVisible)
+            {
+                window.Show();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppEnvironment.Log("显示工具窗口失败。", ex);
+            return;
+        }
+
+        for (int i = ToolWindows.Count - 1; i >= 0; i--)
+        {
+            Window other = ToolWindows[i];
+            if (ReferenceEquals(other, window) || !other.IsVisible)
+            {
+                continue;
+            }
+
+            try
+            {
+                other.Hide();
+            }
+            catch (Exception ex)
+            {
+                AppEnvironment.Log("隐藏其它工具窗口失败。", ex);
+            }
+        }
+
+        if (window.WindowState == WindowState.Minimized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
+        window.Focus();
     }
 
     /// <summary>窗口若仍存活则激活置前。</summary>

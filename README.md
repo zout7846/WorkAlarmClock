@@ -6,12 +6,12 @@
 
 ## 下载与安装
 
-当前版本：**v3.0.0**。支持 Windows 10 / Windows 11，64 位。
+当前版本：**v3.0.1**。支持 Windows 10 / Windows 11，64 位。
 
 | 文件 | 用途 |
 | --- | --- |
-| `WorkAlarmClock-3.0.0-Setup-x64.exe` | 安装向导、开始菜单、可选桌面快捷方式及卸载入口 |
-| `WorkAlarmClock-3.0.0-Portable-win-x64.zip` | 解压整个目录后运行 `WorkAlarmClock.exe` |
+| `WorkAlarmClock-3.0.1-Setup-x64.exe` | 安装向导、开始菜单、可选桌面快捷方式及卸载入口 |
+| `WorkAlarmClock-3.0.1-Portable-win-x64.zip` | 解压整个目录后运行 `WorkAlarmClock.exe` |
 | `SHA256SUMS.txt` | 安装包与便携包的 SHA-256 校验值 |
 
 两个版本均自带 **.NET 10 Windows 桌面运行时**，无需另外安装 .NET。便携版需保留解压后的完整目录，不要只移动 exe。
